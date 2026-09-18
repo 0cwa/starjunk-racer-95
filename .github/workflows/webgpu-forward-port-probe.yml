@@ -1,0 +1,35 @@
+name: WebGPU Forward Port Probe
+
+on:
+  push:
+    branches:
+      - engine/webgpu-port-spike
+    paths:
+      - "engine/**"
+      - "tools/engine/**"
+      - ".github/workflows/webgpu-forward-port-probe.yml"
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe pinned 4.7.2 merge
+        run: tools/engine/forward_port_probe.sh build/forward-port-probe
+      - name: Show conflict report
+        run: |
+          cat build/forward-port-probe/report.json
+          echo
+          cat build/forward-port-probe/status.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: webgpu-forward-port-probe
+          path: |
+            build/forward-port-probe/report.json
+            build/forward-port-probe/status.txt
+            build/forward-port-probe/merge.stdout
+            build/forward-port-probe/merge.stderr
+          if-no-files-found: error
