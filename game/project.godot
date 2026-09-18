@@ -1,0 +1,24 @@
+; Engine configuration file.
+; Prefer editing with the Godot editor, but keep changes reviewable.
+
+config_version=5
+
+[application]
+
+config/name="Starjunk Racer 95"
+run/main_scene="res://src/bootstrap/main.tscn"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/vsync/vsync_mode=0
+
+[rendering]
+
+renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="mobile"
+renderer/rendering_method.web="mobile"
+textures/default_filters/use_nearest_mipmap_filter=false

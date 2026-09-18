@@ -1,0 +1,24 @@
+# Godot
+game/.godot/
+game/.import/
+game/exported/
+*.tmp
+
+# Builds and engine checkouts
+build/
+.cache/
+engine/worktrees/
+engine/builds/
+
+# Performance output
+perf/results/*.json
+!perf/results/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+
+# OS/editors
+.DS_Store
+.vscode/
+.idea/

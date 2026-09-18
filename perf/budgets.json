@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "metrics": {
+    "frame_ms_p95": {"max_relative_regression": 0.08},
+    "frame_ms_p99": {"max_relative_regression": 0.12},
+    "draw_calls_p95": {"max_relative_regression": 0.10}
+  }
+}

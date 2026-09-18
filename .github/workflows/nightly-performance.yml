@@ -1,0 +1,26 @@
+name: Nightly Performance
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "31 2 * * *"
+
+jobs:
+  renderer-torture:
+    if: ${{ vars.PERF_RUNNER_ENABLED == 'true' }}
+    runs-on: [self-hosted, starjunk-gpu]
+    timeout-minutes: 30
+    env:
+      STARJUNK_RUNNER_ID: ${{ vars.PERF_RUNNER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run benchmark
+        env:
+          GODOT_BIN: ${{ vars.PERF_GODOT_BIN }}
+        run: tools/perf/run_godot_benchmark.sh perf/results/renderer-torture.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: renderer-torture-${{ github.sha }}
+          path: perf/results/renderer-torture.json
+          if-no-files-found: error

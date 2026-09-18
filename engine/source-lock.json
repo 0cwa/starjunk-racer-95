@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "godot_upstream": {
+    "repository": "https://github.com/godotengine/godot.git",
+    "tag": "4.7.2-stable",
+    "commit": "ed1daf0bf001b61586d9930840f2f1394092c079"
+  },
+  "webgpu_primary": {
+    "repository": "https://github.com/dwalter/godotwebgpu.git",
+    "ref": "webgpu-4.6.2",
+    "commit": "f329e39ce8db7acaa5c9d6628a530fb769969228"
+  },
+  "webgpu_secondary": {
+    "repository": "https://github.com/davnotdev/godot.git",
+    "ref": "webgpu",
+    "commit": "2502ae7ebcfc8e1002ac590a0f4c9f502cde71e4"
+  },
+  "emscripten": "4.0.11"
+}

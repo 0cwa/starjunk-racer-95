@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starjunk95.invalid/schemas/car.schema.json",
+  "title": "Starjunk Racer 95 car package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "name", "model", "performance_profile"],
+  "properties": {
+    "format": {"const": "starjunk95/car/1"},
+    "name": {"type": "string", "minLength": 1, "maxLength": 96},
+    "author": {"type": "string", "maxLength": 128},
+    "model": {"type": "string", "pattern": "^[^/].*\\.glb$"},
+    "preview": {"type": "string"},
+    "performance_profile": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+    "visual": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scale": {"type": "number", "exclusiveMinimum": 0, "maximum": 10},
+        "wheel_nodes": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 8,
+          "items": {"type": "string"}
+        },
+        "driver_node": {"type": "string"}
+      }
+    }
+  }
+}
