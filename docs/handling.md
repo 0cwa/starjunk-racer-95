@@ -33,3 +33,11 @@ For competitive races, realism is a **race setting**, shared by all racers. It m
 The eventual vehicle controller should be one `RigidBody3D`-based model with raycast suspension and explicit tyre-force calculation. The resolver supplies parameters to that single model.
 
 Before adding multiple final profiles, build automated micro-tracks and telemetry so profile balance can be measured rather than guessed.
+
+## Tyre force model
+
+`TireForceModel` is a pure-math layer intended for each raycast wheel. Its lateral curve has a linear small-slip region, reaches `mu * normal_load` at the configured peak slip angle, then falls smoothly toward a controllable sliding-grip plateau.
+
+Longitudinal and lateral requests are constrained by a normalized friction ellipse. This is where braking/throttle must give up lateral authority during hard combined manoeuvres instead of allowing impossible independent peak forces.
+
+The model is deliberately independent of `RigidBody3D`, suspension raycasts and input code so it can be unit-tested and reused by headless balance simulations.
