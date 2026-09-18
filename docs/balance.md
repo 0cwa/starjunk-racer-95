@@ -10,7 +10,7 @@ Starjunk Racer 95 should have cars with strong personalities but no universally 
 - **hard brake** — standardized braking after a fixed launch;
 - **steady corner** — fixed throttle and steering input.
 
-Each scenario records distance, starting/ending/mean/max speed, lateral speed, yaw rate, wheel slip and grounded-contact ratio. CI uploads the JSON as `vehicle-characterization`.
+Each scenario records distance, starting/ending/mean/max speed, lateral speed, yaw rate, lateral wheel slip, longitudinal slip ratio, wheel angular speed and grounded-contact ratio. Longitudinal slip is especially important when tuning drive torque, wheel inertia and post-peak traction: a slower launch should not be “fixed” until we know whether it reflects intended tyre slip or pathological wheelspin. CI uploads the JSON as `vehicle-characterization`.
 
 The balance characterization uses `realism = 1.0` so car identity is measured without the race-wide arcade-assist layer. We can separately characterize feel settings when needed.
 
