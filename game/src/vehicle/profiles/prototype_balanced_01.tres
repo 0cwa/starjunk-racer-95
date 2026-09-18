@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="VehiclePerformanceProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/vehicle/performance_profile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+profile_id = &"prototype_balanced_01"
+display_name = "Prototype Balanced"
+mass_kg = 900.0
+wheelbase_m = 2.45
+track_width_m = 1.55
+wheel_radius_m = 0.31
+max_drive_force_n = 9200.0
+max_brake_force_n = 14500.0
+base_grip_coefficient = 1.08
+base_cornering_stiffness = 28000.0
+base_peak_slip_angle_deg = 8.5
+longitudinal_grip_bias = 1.0
