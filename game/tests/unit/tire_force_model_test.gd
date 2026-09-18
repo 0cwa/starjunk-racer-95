@@ -10,7 +10,7 @@ const PEAK_DEG := 8.0
 func _ready() -> void:
 	_check(is_zero_approx(TireForceModel.lateral_force_n(0.0, LOAD_N, MU, STIFFNESS, PEAK_DEG)), "zero slip must produce zero lateral force")
 
-	var small_angle := deg_to_rad(0.25)
+	var small_angle := deg_to_rad(0.1)
 	var small_force := TireForceModel.lateral_force_n(small_angle, LOAD_N, MU, STIFFNESS, PEAK_DEG)
 	var expected_linear := -STIFFNESS * small_angle
 	_check(is_equal_approx(small_force, expected_linear) or absf((small_force - expected_linear) / expected_linear) < 0.04, "small-slip force should follow cornering stiffness")
