@@ -26,6 +26,12 @@ static func resolve(profile: VehiclePerformanceProfile, realism: float) -> Dicti
 		"wheel_radius_m": profile.wheel_radius_m,
 		"max_drive_force_n": profile.max_drive_force_n,
 		"max_brake_force_n": profile.max_brake_force_n,
+		"suspension_rest_length_m": profile.suspension_rest_length_m,
+		"suspension_travel_m": profile.suspension_travel_m,
+		"suspension_spring_rate_n_per_m": profile.suspension_spring_rate_n_per_m,
+		"suspension_bump_damping_n_s_per_m": profile.suspension_bump_damping_n_s_per_m,
+		"suspension_rebound_damping_n_s_per_m": profile.suspension_rebound_damping_n_s_per_m,
+		"max_suspension_force_n": profile.max_suspension_force_n,
 		"base_grip_coefficient": profile.base_grip_coefficient,
 		"longitudinal_grip_bias": profile.longitudinal_grip_bias,
 
