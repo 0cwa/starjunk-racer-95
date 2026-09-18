@@ -5,7 +5,7 @@
              (goblins ocapn netlayer tcp-tls)
              (fibers conditions))
 
-(define control-protocol "starjunk95/race-control/1")
+(define control-protocol "starjunk95/race-control/2")
 
 (define-actor (^racer-facet bcom racer-id)
   (methods
