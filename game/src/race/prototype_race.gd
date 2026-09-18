@@ -16,8 +16,11 @@ var speed_label: Label
 var lap_label: Label
 var drift_label: Label
 var realism_label: Label
+var active_car_content_id: String = ""
+var active_track_content_id: String = ""
 
 var _camera: Camera3D
+var _track_root: Node3D
 var _spawn_transform := Transform3D.IDENTITY
 var _checkpoint_areas: Array[Area3D] = []
 var _wheel_visuals: Array[Dictionary] = []
@@ -28,8 +31,7 @@ var _camera_initialized := false
 func _ready() -> void:
 	DefaultInputBindings.ensure_defaults()
 	_build_world()
-	_build_track_visuals()
-	_build_checkpoints()
+	_build_generated_track()
 	_build_vehicle()
 	_build_camera()
 	_build_hud()
@@ -94,6 +96,114 @@ func checkpoint_count() -> int:
 func current_lap() -> int:
 	return _lap
 
+func mount_community_bundle(bundle: Dictionary) -> String:
+	for key in [
+		"car_content_id",
+		"track_content_id",
+		"car_manifest",
+		"car_visual",
+		"performance_profile",
+		"track_visual",
+		"track_collision",
+		"checkpoints",
+		"spawn_points",
+	]:
+		if not bundle.has(key):
+			return "community bundle missing %s" % key
+
+	var car_visual = bundle["car_visual"]
+	var track_visual = bundle["track_visual"]
+	var track_collision = bundle["track_collision"]
+	var profile = bundle["performance_profile"]
+	if not car_visual is Node3D or not track_visual is Node3D or not track_collision is Node3D:
+		return "community bundle runtime nodes must be Node3D"
+	if car_visual.get_parent() != null or track_visual.get_parent() != null or track_collision.get_parent() != null:
+		return "community bundle runtime nodes are already mounted"
+	if not profile is VehiclePerformanceProfile:
+		return "community bundle has invalid performance profile"
+	var checkpoints = bundle["checkpoints"]
+	var spawn_points = bundle["spawn_points"]
+	if not checkpoints is Array or checkpoints.size() < 2:
+		return "community bundle requires at least two checkpoints"
+	if not spawn_points is Array or spawn_points.is_empty() or not spawn_points[0] is Transform3D:
+		return "community bundle requires a spawn transform"
+
+	var new_track_root := Node3D.new()
+	new_track_root.name = "TrackRuntime"
+	new_track_root.add_child(track_visual)
+	new_track_root.add_child(track_collision)
+	var new_areas: Array[Area3D] = []
+	for index in range(checkpoints.size()):
+		var checkpoint = checkpoints[index]
+		if not checkpoint is Dictionary:
+			new_track_root.free()
+			return "community checkpoint must be an object"
+		var area := _make_declared_checkpoint(checkpoint, index)
+		if area == null:
+			new_track_root.free()
+			return "community checkpoint is malformed"
+		new_track_root.add_child(area)
+		new_areas.append(area)
+
+	if _track_root != null and is_instance_valid(_track_root):
+		remove_child(_track_root)
+		_track_root.free()
+	_track_root = new_track_root
+	add_child(_track_root)
+	_checkpoint_areas = new_areas
+	_spawn_transform = spawn_points[0]
+	_next_checkpoint = 0
+	_lap = 0
+
+	active_car_content_id = str(bundle["car_content_id"])
+	active_track_content_id = str(bundle["track_content_id"])
+	var car_manifest: Dictionary = bundle["car_manifest"]
+	var visual_scale := 1.0
+	if car_manifest.get("visual") is Dictionary:
+		visual_scale = float(car_manifest["visual"].get("scale", 1.0))
+	_build_vehicle(profile, car_visual, visual_scale)
+	set_realism(starting_realism)
+	reset_vehicle()
+	bundle.clear()
+	return ""
+
+func restore_generated_content() -> void:
+	active_car_content_id = ""
+	active_track_content_id = ""
+	_next_checkpoint = 0
+	_lap = 0
+	_build_generated_track()
+	_build_vehicle()
+	set_realism(starting_realism)
+	reset_vehicle()
+
+func _make_declared_checkpoint(checkpoint: Dictionary, index: int) -> Area3D:
+	if not checkpoint.get("position") is Array or checkpoint["position"].size() != 3:
+		return null
+	if not checkpoint.get("size") is Array or checkpoint["size"].size() != 3:
+		return null
+	var position_values: Array = checkpoint["position"]
+	var size_values: Array = checkpoint["size"]
+	var area := Area3D.new()
+	area.name = "Checkpoint%02d" % index
+	area.monitoring = true
+	area.position = Vector3(
+		float(position_values[0]),
+		float(position_values[1]),
+		float(position_values[2])
+	)
+	var shape_node := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(
+		float(size_values[0]),
+		float(size_values[1]),
+		float(size_values[2])
+	)
+	shape_node.shape = shape
+	area.add_child(shape_node)
+	area.body_entered.connect(_on_checkpoint_body_entered.bind(index))
+	return area
+
 func _build_world() -> void:
 	var environment_node := WorldEnvironment.new()
 	environment_node.name = "WorldEnvironment"
@@ -115,6 +225,26 @@ func _build_world() -> void:
 	sun.shadow_enabled = true
 	add_child(sun)
 
+
+func _build_generated_track() -> void:
+	_replace_track_root()
+	_build_fallback_floor()
+	_build_track_visuals()
+	_build_checkpoints()
+	var spawn_point := _ellipse_point(SPAWN_ANGLE, TRACK_RADIUS_X, TRACK_RADIUS_Z) + Vector3.UP * 0.78
+	var spawn_forward := _ellipse_tangent(SPAWN_ANGLE, TRACK_RADIUS_X, TRACK_RADIUS_Z)
+	_spawn_transform = Transform3D(Basis.looking_at(spawn_forward, Vector3.UP), spawn_point)
+
+func _replace_track_root() -> void:
+	if _track_root != null and is_instance_valid(_track_root):
+		remove_child(_track_root)
+		_track_root.free()
+	_track_root = Node3D.new()
+	_track_root.name = "TrackRuntime"
+	add_child(_track_root)
+	_checkpoint_areas.clear()
+
+func _build_fallback_floor() -> void:
 	var floor := StaticBody3D.new()
 	floor.name = "Floor"
 	floor.position = Vector3(0.0, -0.5, 0.0)
@@ -123,7 +253,7 @@ func _build_world() -> void:
 	shape.size = Vector3(120.0, 1.0, 120.0)
 	collision.shape = shape
 	floor.add_child(collision)
-	add_child(floor)
+	_track_root.add_child(floor)
 
 	var floor_mesh := MeshInstance3D.new()
 	var floor_box := BoxMesh.new()
@@ -158,7 +288,7 @@ func _build_track_visuals() -> void:
 	var road_instance := MultiMeshInstance3D.new()
 	road_instance.name = "Road"
 	road_instance.multimesh = road_multimesh
-	add_child(road_instance)
+	_track_root.add_child(road_instance)
 
 	var rail_mesh := BoxMesh.new()
 	rail_mesh.size = Vector3(0.22, 0.22, 2.8)
@@ -185,7 +315,7 @@ func _build_track_visuals() -> void:
 	var rail_instance := MultiMeshInstance3D.new()
 	rail_instance.name = "NeonRails"
 	rail_instance.multimesh = rails
-	add_child(rail_instance)
+	_track_root.add_child(rail_instance)
 
 	var sparks := GPUParticles3D.new()
 	sparks.name = "TrackSparkles"
@@ -215,7 +345,7 @@ func _build_track_visuals() -> void:
 	sparkle_material.emission_energy_multiplier = 2.2
 	sparkle_mesh.material = sparkle_material
 	sparks.draw_pass_1 = sparkle_mesh
-	add_child(sparks)
+	_track_root.add_child(sparks)
 
 func _build_checkpoints() -> void:
 	_checkpoint_areas.clear()
@@ -233,12 +363,21 @@ func _build_checkpoints() -> void:
 		shape_node.shape = shape
 		area.add_child(shape_node)
 		area.body_entered.connect(_on_checkpoint_body_entered.bind(index))
-		add_child(area)
+		_track_root.add_child(area)
 		_checkpoint_areas.append(area)
 
-func _build_vehicle() -> void:
+func _build_vehicle(
+		profile: VehiclePerformanceProfile = null,
+		car_visual: Node3D = null,
+		car_visual_scale: float = 1.0
+) -> void:
+	if vehicle != null and is_instance_valid(vehicle):
+		remove_child(vehicle)
+		vehicle.free()
+	vehicle = null
 	_wheel_visuals.clear()
-	var profile: VehiclePerformanceProfile = load("res://src/vehicle/profiles/prototype_balanced_01.tres")
+	if profile == null:
+		profile = load("res://src/vehicle/profiles/prototype_balanced_01.tres")
 	vehicle = RaycastVehicleController.new()
 	vehicle.name = "PlayerCar"
 	vehicle.performance_profile = profile
@@ -251,61 +390,65 @@ func _build_vehicle() -> void:
 	collision.shape = chassis_shape
 	vehicle.add_child(collision)
 
-	var body_visual := MeshInstance3D.new()
-	body_visual.name = "BodyVisual"
-	var body_mesh := BoxMesh.new()
-	body_mesh.size = Vector3(1.55, 0.48, 2.9)
-	var body_material := StandardMaterial3D.new()
-	body_material.albedo_color = Color(0.78, 0.06, 0.95)
-	body_material.metallic = 0.82
-	body_material.roughness = 0.18
-	body_material.emission_enabled = true
-	body_material.emission = Color(0.42, 0.015, 0.9)
-	body_material.emission_energy_multiplier = 1.2
-	body_mesh.material = body_material
-	body_visual.mesh = body_mesh
-	body_visual.position.y = 0.12
-	vehicle.add_child(body_visual)
+	if car_visual != null:
+		car_visual.name = "CommunityCarVisual"
+		car_visual.scale *= maxf(car_visual_scale, 0.001)
+		vehicle.add_child(car_visual)
+	else:
+		var body_visual := MeshInstance3D.new()
+		body_visual.name = "BodyVisual"
+		var body_mesh := BoxMesh.new()
+		body_mesh.size = Vector3(1.55, 0.48, 2.9)
+		var body_material := StandardMaterial3D.new()
+		body_material.albedo_color = Color(0.78, 0.06, 0.95)
+		body_material.metallic = 0.82
+		body_material.roughness = 0.18
+		body_material.emission_enabled = true
+		body_material.emission = Color(0.42, 0.015, 0.9)
+		body_material.emission_energy_multiplier = 1.2
+		body_mesh.material = body_material
+		body_visual.mesh = body_mesh
+		body_visual.position.y = 0.12
+		vehicle.add_child(body_visual)
 
 	var half_track := profile.track_width_m * 0.5
 	var half_wheelbase := profile.wheelbase_m * 0.5
-	_add_wheel(Vector3(-half_track, 0.0, -half_wheelbase), true, false)
-	_add_wheel(Vector3(half_track, 0.0, -half_wheelbase), true, false)
-	_add_wheel(Vector3(-half_track, 0.0, half_wheelbase), false, true)
-	_add_wheel(Vector3(half_track, 0.0, half_wheelbase), false, true)
+	var show_game_wheels := car_visual == null
+	_add_wheel(Vector3(-half_track, 0.0, -half_wheelbase), true, false, show_game_wheels)
+	_add_wheel(Vector3(half_track, 0.0, -half_wheelbase), true, false, show_game_wheels)
+	_add_wheel(Vector3(-half_track, 0.0, half_wheelbase), false, true, show_game_wheels)
+	_add_wheel(Vector3(half_track, 0.0, half_wheelbase), false, true, show_game_wheels)
 
-	var spawn_point := _ellipse_point(SPAWN_ANGLE, TRACK_RADIUS_X, TRACK_RADIUS_Z) + Vector3.UP * 0.78
-	var spawn_forward := _ellipse_tangent(SPAWN_ANGLE, TRACK_RADIUS_X, TRACK_RADIUS_Z)
-	_spawn_transform = Transform3D(Basis.looking_at(spawn_forward, Vector3.UP), spawn_point)
 	vehicle.transform = _spawn_transform
 	add_child(vehicle)
 
-func _add_wheel(position: Vector3, steerable: bool, driven: bool) -> void:
+func _add_wheel(position: Vector3, steerable: bool, driven: bool, show_visual: bool = true) -> void:
 	var wheel := RaycastWheel3D.new()
 	wheel.position = position
 	wheel.steerable = steerable
 	wheel.driven = driven
 	vehicle.add_child(wheel)
 
-	var visual_pivot := Node3D.new()
-	visual_pivot.name = "WheelVisualPivot%02d" % _wheel_visuals.size()
-	visual_pivot.position = position + Vector3.DOWN * 0.18
-	vehicle.add_child(visual_pivot)
+	if show_visual:
+		var visual_pivot := Node3D.new()
+		visual_pivot.name = "WheelVisualPivot%02d" % _wheel_visuals.size()
+		visual_pivot.position = position + Vector3.DOWN * 0.18
+		vehicle.add_child(visual_pivot)
 
-	var wheel_visual := MeshInstance3D.new()
-	var wheel_mesh := CylinderMesh.new()
-	wheel_mesh.top_radius = 0.31
-	wheel_mesh.bottom_radius = 0.31
-	wheel_mesh.height = 0.18
-	var wheel_material := StandardMaterial3D.new()
-	wheel_material.albedo_color = Color(0.018, 0.018, 0.025)
-	wheel_material.metallic = 0.25
-	wheel_material.roughness = 0.5
-	wheel_mesh.material = wheel_material
-	wheel_visual.mesh = wheel_mesh
-	wheel_visual.rotation_degrees.z = 90.0
-	visual_pivot.add_child(wheel_visual)
-	_wheel_visuals.append({"wheel": wheel, "pivot": visual_pivot})
+		var wheel_visual := MeshInstance3D.new()
+		var wheel_mesh := CylinderMesh.new()
+		wheel_mesh.top_radius = 0.31
+		wheel_mesh.bottom_radius = 0.31
+		wheel_mesh.height = 0.18
+		var wheel_material := StandardMaterial3D.new()
+		wheel_material.albedo_color = Color(0.018, 0.018, 0.025)
+		wheel_material.metallic = 0.25
+		wheel_material.roughness = 0.5
+		wheel_mesh.material = wheel_material
+		wheel_visual.mesh = wheel_mesh
+		wheel_visual.rotation_degrees.z = 90.0
+		visual_pivot.add_child(wheel_visual)
+		_wheel_visuals.append({"wheel": wheel, "pivot": visual_pivot})
 
 func _build_camera() -> void:
 	_camera = Camera3D.new()
@@ -397,7 +540,7 @@ func _update_hud() -> void:
 	if speed_label != null:
 		speed_label.text = "%03d km/h" % int(round(vehicle.linear_velocity.length() * 3.6))
 	if lap_label != null:
-		lap_label.text = "LAP %d   //   CP %d/%d" % [_lap + 1, _next_checkpoint, CHECKPOINTS]
+		lap_label.text = "LAP %d   //   CP %d/%d" % [_lap + 1, _next_checkpoint, checkpoint_count()]
 	if drift_label != null:
 		var total_slip := 0.0
 		var grounded := 0
@@ -412,7 +555,7 @@ func _on_checkpoint_body_entered(body: Node3D, checkpoint_index: int) -> void:
 	if body != vehicle or checkpoint_index != _next_checkpoint:
 		return
 	_next_checkpoint += 1
-	if _next_checkpoint >= CHECKPOINTS:
+	if _next_checkpoint >= _checkpoint_areas.size():
 		_next_checkpoint = 0
 		_lap += 1
 

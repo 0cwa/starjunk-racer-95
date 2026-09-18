@@ -74,5 +74,7 @@ jobs:
         run: 'timeout 30s "$GODOT_BIN" --headless --path game res://tests/unit/community_track_importer_test.tscn'
       - name: Run community race bundle integration test
         run: 'timeout 45s "$GODOT_BIN" --headless --path game res://tests/integration/community_race_bundle_test.tscn'
+      - name: Run community content playable race test
+        run: 'timeout 45s "$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/community_content_playable_race_test.tscn'
       - name: Load renderer torture scene
         run: '"$GODOT_BIN" --headless --path game res://tests/perf/renderer_torture/renderer_torture.tscn --quit-after 20'
