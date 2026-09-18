@@ -12,6 +12,10 @@ var max_abs_wheel_slip_angle_deg: float = 0.0
 var _abs_wheel_slip_angle_sum_deg: float = 0.0
 var max_abs_longitudinal_slip_ratio: float = 0.0
 var _abs_longitudinal_slip_sum: float = 0.0
+var _driven_abs_longitudinal_slip_sum: float = 0.0
+var _free_abs_longitudinal_slip_sum: float = 0.0
+var _driven_grounded_samples: int = 0
+var _free_grounded_samples: int = 0
 var max_abs_wheel_angular_speed_rad_s: float = 0.0
 var _grounded_wheel_samples: int = 0
 var _wheel_samples: int = 0
@@ -49,6 +53,12 @@ func sample(delta_seconds: float, body: RigidBody3D, wheel_samples: Array[Dictio
 		max_abs_wheel_slip_angle_deg = maxf(max_abs_wheel_slip_angle_deg, slip_deg)
 		var longitudinal_slip := absf(float(wheel_sample.get("longitudinal_slip_ratio", 0.0)))
 		_abs_longitudinal_slip_sum += longitudinal_slip
+		if bool(wheel_sample.get("driven", false)):
+			_driven_grounded_samples += 1
+			_driven_abs_longitudinal_slip_sum += longitudinal_slip
+		else:
+			_free_grounded_samples += 1
+			_free_abs_longitudinal_slip_sum += longitudinal_slip
 		max_abs_longitudinal_slip_ratio = maxf(max_abs_longitudinal_slip_ratio, longitudinal_slip)
 		max_abs_wheel_angular_speed_rad_s = maxf(
 			max_abs_wheel_angular_speed_rad_s,
@@ -59,6 +69,8 @@ func summary(scenario: String, profile_id: StringName, realism: float, start_spe
 	var mean_speed := _speed_sum_mps / float(sample_count) if sample_count > 0 else 0.0
 	var mean_abs_slip := _abs_wheel_slip_angle_sum_deg / float(_grounded_wheel_samples) if _grounded_wheel_samples > 0 else 0.0
 	var mean_abs_longitudinal_slip := _abs_longitudinal_slip_sum / float(_grounded_wheel_samples) if _grounded_wheel_samples > 0 else 0.0
+	var mean_driven_abs_longitudinal_slip := _driven_abs_longitudinal_slip_sum / float(_driven_grounded_samples) if _driven_grounded_samples > 0 else 0.0
+	var mean_free_abs_longitudinal_slip := _free_abs_longitudinal_slip_sum / float(_free_grounded_samples) if _free_grounded_samples > 0 else 0.0
 	var grounded_ratio := float(_grounded_wheel_samples) / float(_wheel_samples) if _wheel_samples > 0 else 0.0
 	return {
 		"scenario": scenario,
@@ -76,6 +88,8 @@ func summary(scenario: String, profile_id: StringName, realism: float, start_spe
 		"mean_abs_wheel_slip_angle_deg": mean_abs_slip,
 		"max_abs_wheel_slip_angle_deg": max_abs_wheel_slip_angle_deg,
 		"mean_abs_longitudinal_slip_ratio": mean_abs_longitudinal_slip,
+		"mean_driven_abs_longitudinal_slip_ratio": mean_driven_abs_longitudinal_slip,
+		"mean_free_abs_longitudinal_slip_ratio": mean_free_abs_longitudinal_slip,
 		"max_abs_longitudinal_slip_ratio": max_abs_longitudinal_slip_ratio,
 		"max_abs_wheel_angular_speed_rad_s": max_abs_wheel_angular_speed_rad_s,
 		"grounded_wheel_sample_ratio": grounded_ratio,

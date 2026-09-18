@@ -100,3 +100,6 @@ These are race-wide feel settings in competitive multiplayer. They do not change
 `RaycastWheel3D` computes longitudinal slip from contact-patch road speed versus wheel circumferential speed. `TireForceModel.longitudinal_force_n` uses the same shaped peak/post-peak philosophy as the lateral curve. The requested longitudinal and lateral forces still share one friction ellipse, so wheelspin does not create extra grip.
 
 Wheel inertia, longitudinal stiffness, peak longitudinal slip and maximum angular speed are trusted performance-profile values and are independent of the realism slider. The race-wide realism setting may raise post-peak recovery grip for easier slide recovery, but it does not change the peak friction envelope.
+
+
+The rotational integrator clamps tyre-reaction movement at the instantaneous rolling-speed equilibrium. This is a numerical stability rule, not traction control: drive torque may still push a driven wheel beyond rolling speed and brakes may still hold it below rolling speed, but an undriven tyre cannot overshoot from positive to negative slip solely because a 60 Hz explicit reaction-torque step was too large.

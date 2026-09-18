@@ -38,6 +38,7 @@ func sample_and_apply(
 		_previous_compression_m = 0.0
 		wheel_angular_speed_rad_s = WheelRotationModel.integrate_angular_speed(
 			wheel_angular_speed_rad_s,
+			wheel_angular_speed_rad_s,
 			drive_torque_nm,
 			brake_torque_nm,
 			0.0,
@@ -88,6 +89,7 @@ func sample_and_apply(
 		var force_offset_fallback := contact_point - body.global_position
 		body.apply_force(body_up * normal_force, force_offset_fallback)
 		wheel_angular_speed_rad_s = WheelRotationModel.integrate_angular_speed(
+			wheel_angular_speed_rad_s,
 			wheel_angular_speed_rad_s,
 			drive_torque_nm,
 			brake_torque_nm,
@@ -153,6 +155,7 @@ func sample_and_apply(
 	var tyre_reaction_torque_nm := -combined.x * wheel_radius
 	wheel_angular_speed_rad_s = WheelRotationModel.integrate_angular_speed(
 		wheel_angular_speed_rad_s,
+		WheelSlipKinematics.wheel_angular_speed_for_rolling(longitudinal_speed, wheel_radius),
 		drive_torque_nm,
 		brake_torque_nm,
 		tyre_reaction_torque_nm,
@@ -164,6 +167,7 @@ func sample_and_apply(
 
 	last_sample = {
 		"grounded": true,
+		"driven": driven,
 		"contact_point": contact_point,
 		"compression_m": compression,
 		"normal_force_n": normal_force,
