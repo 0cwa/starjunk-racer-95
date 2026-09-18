@@ -26,6 +26,21 @@ Downloaded ZIP packages pass through `CommunityPackageArchive` before any manife
 
 The extractor writes every ZIP entry itself rather than restoring archive permissions, so an archive cannot create filesystem symlinks or executable permission state. A root `manifest.json` is required and is validated before the staging result is accepted.
 
+## Content identity
+
+A package's location and its identity are separate concepts. `CommunityPackageIdentity` hashes every file in a validated package using SHA-256, sorts the package-relative paths, and hashes a canonical file index into a package content ID of the form `sha256:<hex>`.
+
+The descriptor includes each file's path, byte size, and SHA-256 digest. Directory enumeration order does not affect the result; changing any file bytes, path, or size changes the package ID.
+
+This is intentionally complementary to Spritely capabilities:
+
+- a **content ID** answers “which exact immutable package bytes are we talking about?”;
+- a **capability** answers “who has authority to retrieve, use, re-share, fork, or publish this content?”
+
+Race invitations should ultimately bind both so a mutable publisher capability cannot cause different peers to race on different track bytes.
+
+The identity builder rejects symlinks/reparse points and applies the same path/count/file/total-size limits as archive staging. Hashing is streamed in chunks rather than loading large package files into memory.
+
 ## Runtime car visual import
 
 `CommunityCarImporter` now loads a validated car GLB at runtime.
