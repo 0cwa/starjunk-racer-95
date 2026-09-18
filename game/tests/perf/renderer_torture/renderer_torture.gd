@@ -1,7 +1,7 @@
 extends Node3D
 
 const SCENARIO := "renderer_torture"
-const SCENARIO_VERSION := 1
+const SCENARIO_VERSION := 2
 const DEFAULT_WARMUP := 180
 const DEFAULT_FRAMES := 600
 
@@ -12,9 +12,13 @@ var _warmup_frames := DEFAULT_WARMUP
 var _sample_frames := DEFAULT_FRAMES
 var _output_path := ""
 var _frame_times_ms: Array[float] = []
+var _process_times_ms: Array[float] = []
+var _physics_times_ms: Array[float] = []
 var _draw_calls: Array[float] = []
 var _frame_index := 0
 var _last_tick_usec := 0
+var _scene_time := 0.0
+var _pipeline_compilations_start := 0.0
 
 func _ready() -> void:
 	_build_scene()
@@ -22,6 +26,7 @@ func _ready() -> void:
 	_last_tick_usec = Time.get_ticks_usec()
 
 func _process(delta: float) -> void:
+	_scene_time += delta
 	_animate_scene(delta)
 	if not _benchmarking:
 		return
@@ -30,8 +35,12 @@ func _process(delta: float) -> void:
 	_last_tick_usec = now
 	_frame_index += 1
 	if _frame_index <= _warmup_frames:
+		if _frame_index == _warmup_frames:
+			_pipeline_compilations_start = _pipeline_compilation_count()
 		return
 	_frame_times_ms.append(frame_ms)
+	_process_times_ms.append(Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0)
+	_physics_times_ms.append(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0)
 	_draw_calls.append(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
 	if _frame_times_ms.size() >= _sample_frames:
 		_finish_benchmark()
@@ -205,8 +214,8 @@ func _build_car_proxy() -> void:
 	_car_proxy.position = Vector3(0.0, 0.55, -8.5)
 	add_child(_car_proxy)
 
-func _animate_scene(delta: float) -> void:
-	var t := Time.get_ticks_msec() / 1000.0
+func _animate_scene(_delta: float) -> void:
+	var t := _scene_time
 	if _camera:
 		_camera.position = Vector3(cos(t * 0.13) * 18.0, 7.0 + sin(t * 0.2), sin(t * 0.13) * 18.0)
 		_camera.look_at(Vector3(0.0, 1.3, 0.0))
@@ -218,7 +227,11 @@ func _animate_scene(delta: float) -> void:
 func _finish_benchmark() -> void:
 	_benchmarking = false
 	_frame_times_ms.sort()
+	_process_times_ms.sort()
+	_physics_times_ms.sort()
 	_draw_calls.sort()
+	var viewport_size := get_viewport().get_visible_rect().size
+	var version_info := Engine.get_version_info()
 	var result := {
 		"schema_version": 1,
 		"scenario": SCENARIO,
@@ -227,17 +240,25 @@ func _finish_benchmark() -> void:
 		"renderer": RenderingServer.get_current_rendering_method(),
 		"rendering_driver": RenderingServer.get_current_rendering_driver_name(),
 		"runner_id": OS.get_environment("STARJUNK_RUNNER_ID"),
-		"engine_version": Engine.get_version_info().get("string", "unknown"),
-		"settings_hash": "rt-v1-512i-8l-4096p-96t-1280x720",
+		"engine_version": version_info.get("string", "unknown"),
+		"engine_hash": version_info.get("hash", ""),
+		"viewport_width": int(viewport_size.x),
+		"viewport_height": int(viewport_size.y),
+		"settings_hash": "rt-v2-512i-8l-4096p-96t-1280x720",
 		"sample_frames": _frame_times_ms.size(),
 		"frame_ms_mean": _mean(_frame_times_ms),
 		"frame_ms_p50": _percentile(_frame_times_ms, 0.50),
 		"frame_ms_p95": _percentile(_frame_times_ms, 0.95),
 		"frame_ms_p99": _percentile(_frame_times_ms, 0.99),
+		"process_ms_p95": _percentile(_process_times_ms, 0.95),
+		"physics_ms_p95": _percentile(_physics_times_ms, 0.95),
 		"draw_calls_p95": _percentile(_draw_calls, 0.95),
+		"pipeline_compilations_during_sample": maxf(0.0, _pipeline_compilation_count() - _pipeline_compilations_start),
 		"objects_last": Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
 		"primitives_last": Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME),
-		"video_memory_bytes": Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED)
+		"video_memory_bytes": Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED),
+		"texture_memory_bytes": Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED),
+		"buffer_memory_bytes": Performance.get_monitor(Performance.RENDER_BUFFER_MEM_USED)
 	}
 	var payload := JSON.stringify(result)
 	print("STARJUNK_PERF_JSON:" + payload)
@@ -265,3 +286,12 @@ func _percentile(values: Array[float], percentile: float) -> float:
 		return 0.0
 	var index := int(round((values.size() - 1) * percentile))
 	return values[clamp(index, 0, values.size() - 1)]
+
+func _pipeline_compilation_count() -> float:
+	return (
+		Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_CANVAS)
+		+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_MESH)
+		+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SURFACE)
+		+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_DRAW)
+		+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SPECIALIZATION)
+	)
