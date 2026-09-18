@@ -5,6 +5,7 @@
 - `performance.md` — benchmark and regression policy.
 - `handling.md` — vehicle profile and realism-slider architecture.
 - `prototype-race.md` — current playable local vertical slice and controls.
+- `course-presentation.md` — song cue state/signals and rendering-adapter contract.
 - `balance.md` — deterministic vehicle characterization and future balance gates.
 - `modding.md` — community content model.
 - `networking.md` — Spritely integration direction.
