@@ -9,6 +9,7 @@ var throttle_input: float = 0.0
 var brake_input: float = 0.0
 var steer_input: float = 0.0
 var last_wheel_samples: Array[Dictionary] = []
+var last_assist_state: Dictionary = {}
 
 var _wheels: Array[RaycastWheel3D] = []
 
@@ -54,7 +55,35 @@ func _physics_process(delta: float) -> void:
 		* float(handling["max_brake_force_n"])
 		/ float(_wheels.size())
 	)
-	var steer_angle := deg_to_rad(max_steer_angle_deg) * steer_input
+	var body_basis := global_transform.basis.orthonormalized()
+	var forward_speed_mps := linear_velocity.dot(-body_basis.z)
+	var lateral_speed_mps := linear_velocity.dot(body_basis.x)
+	var assisted_steer_input := HandlingAssistModel.assisted_steer_input(
+		steer_input,
+		forward_speed_mps,
+		lateral_speed_mps,
+		float(handling["steering_speed_assist"]),
+		float(handling["countersteer_assist"])
+	)
+	var steer_angle := deg_to_rad(max_steer_angle_deg) * assisted_steer_input
+	var yaw_stability_torque_nm := HandlingAssistModel.yaw_stability_torque_nm(
+		angular_velocity.dot(body_basis.y),
+		forward_speed_mps,
+		lateral_speed_mps,
+		mass,
+		float(handling["wheelbase_m"]),
+		float(handling["yaw_stability_assist"])
+	)
+	if not is_zero_approx(yaw_stability_torque_nm):
+		apply_torque(body_basis.y * yaw_stability_torque_nm)
+
+	last_assist_state = {
+		"driver_steer_input": steer_input,
+		"assisted_steer_input": assisted_steer_input,
+		"forward_speed_mps": forward_speed_mps,
+		"lateral_speed_mps": lateral_speed_mps,
+		"yaw_stability_torque_nm": yaw_stability_torque_nm,
+	}
 
 	last_wheel_samples.clear()
 	for wheel in _wheels:

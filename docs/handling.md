@@ -75,3 +75,19 @@ The future raycast wheel adapter should retain previous compression per wheel, c
 The prototype currently uses rear-wheel drive, front-wheel steering, direct requested longitudinal force, and does not yet simulate wheel rotational inertia or apply the arcade assist terms. Those are explicit next steps, not hidden approximations.
 
 The integration test builds a flat road and four-wheel car entirely in code, lets it settle on its suspension, then applies throttle and requires forward motion without non-finite state. CI uses `--fixed-fps 60` so the physics frames execute deterministically without real-time waiting.
+
+
+## Arcade handling assists
+
+`HandlingAssistModel` is a pure-math layer between player intent and the single physical vehicle model. At realism `1.0`, every assist strength resolves to zero and the controller receives the driver's steering unchanged.
+
+At lower realism values:
+
+- speed-sensitive steering reduces high-speed twitch without increasing the car's maximum steering angle;
+- countersteer assistance steers into the direction of lateral slide using chassis slip angle;
+- yaw stability applies corrective torque only while the chassis is sliding, rather than acting as permanent angular damping;
+- grip recovery raises the post-peak tyre-force plateau toward the existing peak-friction limit, so a slide is easier to catch without creating more than `mu * normal_load` lateral grip.
+
+These are race-wide feel settings in competitive multiplayer. They do not change mass, drive force, brake force, dimensions, suspension values, or the peak tyre-friction envelope.
+
+`drift_entry_assist` is still intentionally unused; it should not be wired until we can validate its effect with drift-entry telemetry instead of adding hidden yaw impulses by feel.

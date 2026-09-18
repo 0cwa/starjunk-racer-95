@@ -31,6 +31,8 @@ jobs:
         run: '"$GODOT_BIN" --headless --path game --editor --quit-after 2'
       - name: Run vehicle handling foundation tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/vehicle_handling_test.tscn'
+      - name: Run handling assist model tests
+        run: '"$GODOT_BIN" --headless --path game res://tests/unit/handling_assist_model_test.tscn'
       - name: Run tire force model tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/tire_force_model_test.tscn'
       - name: Run wheel slip kinematics tests
