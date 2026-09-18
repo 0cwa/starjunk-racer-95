@@ -1,5 +1,7 @@
 extends Node
 
+const TEST_CONTENT_ID := "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
 var _failures := PackedStringArray()
 
 func _ready() -> void:
@@ -9,7 +11,13 @@ func _ready() -> void:
 	_finish()
 
 func _test_room_config() -> void:
-	var valid := RaceProtocol.make_room_config(0.35, 3, 8, "ocapn://example.invalid/s/track-cap")
+	var valid := RaceProtocol.make_room_config(
+		0.35,
+		3,
+		8,
+		"ocapn://example.invalid/s/track-cap",
+		TEST_CONTENT_ID
+	)
 	_check(RaceProtocol.validate_room_config(valid).is_empty(), "valid room config should pass")
 	var bad_realism := valid.duplicate(true)
 	bad_realism["realism"] = 1.5
@@ -17,6 +25,9 @@ func _test_room_config() -> void:
 	var local_path := valid.duplicate(true)
 	local_path["track_reference"] = "file:///tmp/track.json"
 	_check(not RaceProtocol.validate_room_config(local_path).is_empty(), "network room track must use a capability reference")
+	var mutable_identity := valid.duplicate(true)
+	mutable_identity["track_content_id"] = "latest"
+	_check(not RaceProtocol.validate_room_config(mutable_identity).is_empty(), "network room track must bind an immutable content ID")
 
 func _test_snapshot() -> void:
 	var snapshot := RaceProtocol.make_snapshot(
@@ -60,12 +71,18 @@ func _test_control_events() -> void:
 		RaceProtocol.EVENT_CONTENT_REFERENCE,
 		3,
 		"racer-95",
-		{"kind": "car", "reference": "ocapn://example.invalid/s/car-cap"}
+		{"kind": "car", "reference": "ocapn://example.invalid/s/car-cap", "content_id": TEST_CONTENT_ID}
 	)
 	_check(RaceProtocol.validate_event(content).is_empty(), "content capability event should pass")
 	var unsafe_content := content.duplicate(true)
 	unsafe_content["data"]["reference"] = "https://central.example/car.zip"
 	_check(not RaceProtocol.validate_event(unsafe_content).is_empty(), "content authority must be represented by a capability reference")
+	var missing_identity := content.duplicate(true)
+	missing_identity["data"].erase("content_id")
+	_check(not RaceProtocol.validate_event(missing_identity).is_empty(), "content references must bind immutable bytes")
+	var uppercase_identity := content.duplicate(true)
+	uppercase_identity["data"]["content_id"] = TEST_CONTENT_ID.to_upper()
+	_check(not RaceProtocol.validate_event(uppercase_identity).is_empty(), "content IDs must use canonical lowercase hex")
 	var unknown := ready.duplicate(true)
 	unknown["type"] = "run_arbitrary_mod_code"
 	_check(not RaceProtocol.validate_event(unknown).is_empty(), "unknown control events must fail closed")

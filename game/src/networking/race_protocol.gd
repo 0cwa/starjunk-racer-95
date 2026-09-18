@@ -1,10 +1,12 @@
 class_name RaceProtocol
 extends RefCounted
 
-const CONTROL_PROTOCOL := "starjunk95/race-control/1"
+const CONTROL_PROTOCOL := "starjunk95/race-control/2"
 const REALTIME_PROTOCOL := "starjunk95/race-state/1"
 const MAX_RACER_ID_BYTES := 96
 const MAX_CAPABILITY_REFERENCE_BYTES := 4096
+const CONTENT_ID_PREFIX := "sha256:"
+const SHA256_HEX_LENGTH := 64
 const MAX_EVENT_DATA_KEYS := 24
 const MAX_RACERS := 16
 const MAX_LAPS := 99
@@ -29,7 +31,8 @@ static func make_room_config(
 		realism: float,
 		laps: int,
 		max_racers: int,
-		track_reference: String
+		track_reference: String,
+		track_content_id: String
 ) -> Dictionary:
 	return {
 		"protocol": CONTROL_PROTOCOL,
@@ -37,6 +40,7 @@ static func make_room_config(
 		"laps": laps,
 		"max_racers": max_racers,
 		"track_reference": track_reference,
+		"track_content_id": track_content_id,
 	}
 
 static func validate_room_config(config: Dictionary) -> String:
@@ -51,7 +55,10 @@ static func validate_room_config(config: Dictionary) -> String:
 		return "laps must be within 1..%d" % MAX_LAPS
 	if not _integer_in_range(config.get("max_racers"), 1, MAX_RACERS):
 		return "max_racers must be within 1..%d" % MAX_RACERS
-	return _validate_capability_reference("track_reference", config.get("track_reference"))
+	var track_reference_error := _validate_capability_reference("track_reference", config.get("track_reference"))
+	if not track_reference_error.is_empty():
+		return track_reference_error
+	return _validate_content_id("track_content_id", config.get("track_content_id"))
 
 static func make_snapshot(
 		sequence: int,
@@ -154,6 +161,9 @@ static func validate_event(event: Dictionary) -> String:
 			var reference_error := _validate_capability_reference("reference", data.get("reference"))
 			if not reference_error.is_empty():
 				return reference_error
+			var content_id_error := _validate_content_id("content_id", data.get("content_id"))
+			if not content_id_error.is_empty():
+				return content_id_error
 		EVENT_REALTIME_LANE:
 			var lane_error := _validate_capability_reference("reference", data.get("reference"))
 			if not lane_error.is_empty():
@@ -170,6 +180,21 @@ static func _validate_capability_reference(label: String, value: Variant) -> Str
 		return "%s has invalid length" % label
 	if not reference.begins_with("ocapn://"):
 		return "%s must be an OCapN sturdyref" % label
+	return ""
+
+static func _validate_content_id(label: String, value: Variant) -> String:
+	if not value is String:
+		return "%s must be a string" % label
+	var content_id := str(value)
+	if not content_id.begins_with(CONTENT_ID_PREFIX):
+		return "%s must use sha256 content identity" % label
+	var digest := content_id.trim_prefix(CONTENT_ID_PREFIX)
+	if digest.length() != SHA256_HEX_LENGTH:
+		return "%s must contain a 64-character SHA-256 digest" % label
+	for index in range(digest.length()):
+		var character := digest.substr(index, 1)
+		if not "0123456789abcdef".contains(character):
+			return "%s must use canonical lowercase hexadecimal" % label
 	return ""
 
 static func _validate_identifier(label: String, value: Variant) -> String:

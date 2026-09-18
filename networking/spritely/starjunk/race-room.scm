@@ -3,7 +3,7 @@
   #:use-module (goblins actor-lib methods)
   #:export (^race-room ^racer-facet race-control-protocol))
 
-(define race-control-protocol "starjunk95/race-control/1")
+(define race-control-protocol "starjunk95/race-control/2")
 
 (define-actor (^racer-facet _bcom racer-id)
   (methods

@@ -6,7 +6,7 @@ Godot talks only to `MultiplayerAdapter` game concepts and validated `RaceProtoc
 
 ## Protocol split
 
-- `starjunk95/race-control/1` — low-frequency room/racer lifecycle, checkpoint/lap/finish events, content references and realtime-lane authorization.
+- `starjunk95/race-control/2` — low-frequency room/racer lifecycle, checkpoint/lap/finish events, content references and realtime-lane authorization. Track and shared-content capabilities are bound to canonical `sha256:` content IDs so authority and immutable byte identity are separate.
 - `starjunk95/race-state/1` — compact sequenced car state/control snapshots for prediction and interpolation.
 
 The split lets us use Spritely where object capabilities are most valuable without coupling rendering/physics tick rate to CapTP latency or protocol overhead.
@@ -27,3 +27,10 @@ See `networking/spritely-bridge.md` for capability facets and bridge boundaries.
 6. share a custom car/track content capability reference.
 
 Network-version upgrades are explicit compatibility work, not dependency bumps.
+
+
+## Control protocol v2 content binding
+
+Version 2 is an intentional pre-release breaking change from `race-control/1`. A race room now carries both `track_reference` (the OCapN capability granting authority/access) and `track_content_id` (the immutable SHA-256 package identity). Content-reference events similarly require both fields.
+
+The realtime snapshot protocol remains `starjunk95/race-state/1`; its wire semantics did not change.
