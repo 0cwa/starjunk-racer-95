@@ -4,7 +4,7 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
-apt-get install -y --no-install-recommends   ca-certificates   guile-3.0   guile-goblins   guile-hoot   guile-websocket   nodejs   wabt
+apt-get install -y --no-install-recommends   ca-certificates   guile-3.0   guile-goblins   guile-hoot   guile-websocket   nodejs
 
 timeout 60s guile networking/spritely/captp_room_smoke.scm
 
@@ -32,5 +32,13 @@ hoot compile   -L "$GOBLINS_HOOT_ROOT"   --bundle=build/spritely   -o build/spri
 test -s build/spritely/starjunk-spritely-room.wasm
 
 # Capture the exact host import contract emitted by the pinned Goblins/Hoot pair.
-wasm-objdump -x build/spritely/starjunk-spritely-room.wasm > build/spritely/starjunk-spritely-room.imports.txt
-grep -q "crypto" build/spritely/starjunk-spritely-room.imports.txt
+# Hoot emits Wasm GC/reference types that Debian's current wabt does not parse,
+# while the browser-generation Node runtime does.
+node - <<'NODE' > build/spritely/starjunk-spritely-room.imports.json
+const fs = require('fs');
+const bytes = fs.readFileSync('build/spritely/starjunk-spritely-room.wasm');
+const module = new WebAssembly.Module(bytes);
+console.log(JSON.stringify(WebAssembly.Module.imports(module), null, 2));
+NODE
+
+grep -q '"module": "crypto"' build/spritely/starjunk-spritely-room.imports.json
