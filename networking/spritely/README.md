@@ -23,3 +23,17 @@ The native tests deliberately do not send high-frequency car snapshots through G
 - `.github/workflows/spritely-spike.yml` — delegates to the same container harness developers can run locally.
 
 Hoot's local `--run` VM is not used as a browser runtime test because it does not provide Goblins' browser host imports. The next slice should implement those JavaScript host imports, instantiate this Wasm in a real browser, and expose a narrow API to Godot through the multiplayer adapter.
+
+
+## Content capability proof
+
+`starjunk/content.scm` adds a read-only content authority shape:
+
+- `^content-reader` exposes an immutable content descriptor and can open a named file.
+- `open-blob` returns a separate `^blob-reader` capability; it does not hand the client broader content/publish authority.
+- `^blob-reader` exposes size and bounded ranged reads only.
+- every ranged read is capped at 64 KiB and clipped at EOF.
+
+`tests/captp-content-reader.scm` registers a content reader, enlivens it from a second node, obtains the nested blob capability, and reads a >64 KiB fixture in two messages. This keeps large mod transfers out of single CapTP messages while preserving capability-based authorization.
+
+Publishing/updating/forking content will be a separate facet and is intentionally absent from the reader actor.

@@ -34,3 +34,12 @@ Network-version upgrades are explicit compatibility work, not dependency bumps.
 Version 2 is an intentional pre-release breaking change from `race-control/1`. A race room now carries both `track_reference` (the OCapN capability granting authority/access) and `track_content_id` (the immutable SHA-256 package identity). Content-reference events similarly require both fields.
 
 The realtime snapshot protocol remains `starjunk95/race-state/1`; its wire semantics did not change.
+
+
+## Content-reader capabilities
+
+Community package bytes are not embedded directly in race events. A race/content reference binds an immutable package content ID to an OCapN capability. That capability can resolve to a read-only content object whose descriptor identifies files/hashes and whose `open-blob` method returns a narrower blob-reader facet.
+
+Blob reads are ranged and capped at 64 KiB. This keeps CapTP messages bounded and means a peer can stream, hash, and stage a large GLB/package incrementally without receiving publisher authority.
+
+Publish/update/fork authority will be modeled as separate capabilities rather than methods on the reader facet.

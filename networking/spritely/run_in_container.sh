@@ -24,6 +24,9 @@ esac
 timeout 60s guile networking/spritely/captp_room_smoke.scm
 timeout 60s guile -L networking/spritely   networking/spritely/tests/captp-websocket-two-node.scm
 
+# Nested least-authority content capability: descriptor -> blob facet -> bounded chunks.
+timeout 60s guile -L networking/spritely   networking/spritely/tests/captp-content-reader.scm
+
 mkdir -p build/spritely
 
 GOBLINS_FILE="$(dpkg -L guile-goblins | awk '/\/goblins\.scm$/ { print; exit }')"
