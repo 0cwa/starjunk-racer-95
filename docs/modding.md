@@ -12,7 +12,17 @@ A car package contains a manifest plus GLB/media and references a game-owned `pe
 
 A track package contains visual/collision GLB data plus declarative checkpoints, spawn points, surfaces and optional song/presentation metadata.
 
-Schemas live in `packages/schemas/`.
+Schemas live in `packages/schemas/`. Runtime policy lives behind `StarjunkPackageLoader`.
+
+## Trust boundaries
+
+Treat every community package as untrusted input.
+
+Asset references must stay within the package root. The runtime rejects absolute paths, drive-qualified paths, backslashes and traversal components such as `..`. Generation-1 geometry must be GLB; a package cannot load a `.gd`, `.tscn` or other executable/engine-native payload merely by naming it as its model.
+
+A car's `performance_profile` must exist in `PerformanceProfileRegistry`. Community content may select a trusted profile ID but cannot define or replace the resource behind that ID.
+
+Archive extraction, when added, must independently enforce the same no-traversal rule before writing files.
 
 ## Future programmable mods
 

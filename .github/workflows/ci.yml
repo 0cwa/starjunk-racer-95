@@ -31,5 +31,7 @@ jobs:
         run: '"$GODOT_BIN" --headless --path game --editor --quit-after 2'
       - name: Run vehicle handling foundation tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/vehicle_handling_test.tscn'
+      - name: Run community package safety tests
+        run: '"$GODOT_BIN" --headless --path game res://tests/unit/content_package_test.tscn'
       - name: Load renderer torture scene
         run: '"$GODOT_BIN" --headless --path game res://tests/perf/renderer_torture/renderer_torture.tscn --quit-after 20'
