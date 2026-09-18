@@ -21,9 +21,10 @@
         "additionalProperties": false,
         "required": ["id", "position", "size"],
         "properties": {
-          "id": {"type": "string"},
+          "id": {"type": "string", "minLength": 1, "maxLength": 96},
           "position": {"$ref": "#/$defs/vec3"},
-          "size": {"$ref": "#/$defs/vec3"}
+          "size": {"$ref": "#/$defs/positive_vec3"},
+          "rotation_degrees": {"$ref": "#/$defs/vec3"}
         }
       }
     },
@@ -48,6 +49,12 @@
       "minItems": 3,
       "maxItems": 3,
       "items": {"type": "number"}
+    },
+    "positive_vec3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {"type": "number", "exclusiveMinimum": 0}
     },
     "transform": {
       "type": "object",

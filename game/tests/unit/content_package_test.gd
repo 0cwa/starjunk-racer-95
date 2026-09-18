@@ -40,14 +40,31 @@ func _ready() -> void:
 		"name": "Prism Loop",
 		"environment": "world/environment.glb",
 		"collision": "world/collision.glb",
-		"checkpoints": [{}, {}],
-		"spawn_points": [{}],
+		"checkpoints": [
+			{"id": "start", "position": [0.0, 1.0, 0.0], "size": [8.0, 3.0, 1.0]},
+			{"id": "mid", "position": [0.0, 1.0, -20.0], "size": [8.0, 3.0, 1.0]},
+		],
+		"spawn_points": [
+			{"position": [0.0, 0.5, 2.0], "rotation_degrees": [0.0, 180.0, 0.0]},
+		],
 	}
 	_check(bool(loader.validate_manifest(valid_track).get("ok", false)), "valid track manifest should pass")
 
 	var script_track := valid_track.duplicate(true)
 	script_track["environment"] = "world/track.gd"
 	_check(not bool(loader.validate_manifest(script_track).get("ok", true)), "script payload cannot masquerade as track geometry")
+
+	var duplicate_checkpoints := valid_track.duplicate(true)
+	duplicate_checkpoints["checkpoints"][1]["id"] = "start"
+	_check(not bool(loader.validate_manifest(duplicate_checkpoints).get("ok", true)), "checkpoint ids must be unique")
+
+	var invalid_checkpoint_size := valid_track.duplicate(true)
+	invalid_checkpoint_size["checkpoints"][0]["size"] = [8.0, 0.0, 1.0]
+	_check(not bool(loader.validate_manifest(invalid_checkpoint_size).get("ok", true)), "checkpoint size components must be positive")
+
+	var invalid_spawn := valid_track.duplicate(true)
+	invalid_spawn["spawn_points"][0].erase("rotation_degrees")
+	_check(not bool(loader.validate_manifest(invalid_spawn).get("ok", true)), "spawn transform must include rotation")
 
 	_finish()
 
