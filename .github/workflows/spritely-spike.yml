@@ -2,8 +2,11 @@ name: Spritely Capability Spike
 
 on:
   push:
-    branches:
-      - networking/spritely-executable-spike
+    branches: [main]
+    paths:
+      - "networking/**"
+      - ".github/workflows/spritely-spike.yml"
+  pull_request:
     paths:
       - "networking/**"
       - ".github/workflows/spritely-spike.yml"

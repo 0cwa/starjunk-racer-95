@@ -42,3 +42,4 @@ console.log(JSON.stringify(WebAssembly.Module.imports(module), null, 2));
 NODE
 
 grep -q '"module": "crypto"' build/spritely/starjunk-spritely-room.imports.json
+cat build/spritely/starjunk-spritely-room.imports.json
