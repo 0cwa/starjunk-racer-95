@@ -40,8 +40,13 @@ func _ready() -> void:
 		"name": "Prism Loop",
 		"environment": "world/environment.glb",
 		"collision": "world/collision.glb",
-		"checkpoints": [{}, {}],
-		"spawn_points": [{}],
+		"checkpoints": [
+			{"id": "start", "position": [0.0, 1.0, 0.0], "size": [4.0, 2.0, 1.0]},
+			{"id": "cp-1", "position": [0.0, 1.0, -20.0], "size": [4.0, 2.0, 1.0]},
+		],
+		"spawn_points": [
+			{"position": [0.0, 0.5, 2.0], "rotation_degrees": [0.0, 180.0, 0.0]},
+		],
 	}
 	_check(bool(loader.validate_manifest(valid_track).get("ok", false)), "valid track manifest should pass")
 
