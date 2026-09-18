@@ -14,7 +14,9 @@ The default project scene is now a small local vertical slice rather than an emp
 - reset/recovery control;
 - lightweight GPU spark field so the prototype already exercises the intended saturated/glowing visual direction.
 
-The course geometry is deliberately generated from code and uses `MultiMeshInstance3D` for repeated road/rail pieces. It is a mechanics sandbox, not one of the final song-inspired courses.
+The fallback course geometry is deliberately generated from code and uses `MultiMeshInstance3D` for repeated road/rail pieces. It is a mechanics sandbox, not one of the final song-inspired courses.
+
+The same scene can now consume a validated `CommunityRaceBundle`. Mounting a bundle atomically replaces the generated track visual/collision/checkpoints/spawn, rebuilds the car from the bundle's trusted game-owned performance profile, and mounts the sanitized community car visual. The race stores the exact car/track content IDs but does not know how packages were archived, hashed, authorized, or imported.
 
 ## Controls
 
@@ -33,4 +35,4 @@ This is the shortest playable loop for continuous development. New vehicle, came
 
 ## Next gameplay work
 
-The next meaningful handling additions are wheel rotational inertia/longitudinal slip, better drift-entry behavior with telemetry, and real road-surface metadata. The next content step is to allow a validated community car visual and community track package to replace the prototype presentation while retaining trusted race physics/rules.
+The next meaningful handling additions are better drift-entry behavior with telemetry, longitudinal load transfer, and real road-surface metadata. On the content side, the next step is user-facing package selection/installation plus song cue presentation, since validated community car/track bundles can now replace the prototype race content while retaining trusted race physics/rules.
