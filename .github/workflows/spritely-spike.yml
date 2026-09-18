@@ -13,15 +13,42 @@ on:
   workflow_dispatch:
 
 jobs:
-  goblins-and-hoot:
+  goblins-hoot:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    container: debian:sid
+    timeout-minutes: 15
     steps:
+      - name: Install Spritely packages
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y             ca-certificates             git             guile-3.0             guile-goblins             guile-hoot             guile-gnutls             guile-websocket
       - uses: actions/checkout@v4
-      - name: Run Goblins CapTP and Hoot compile probes
-        run: networking/spritely/run_spike.sh
+      - name: Assert pinned package families
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOBLINS="$(dpkg-query -W -f='${Version}' guile-goblins)"
+          HOOT="$(dpkg-query -W -f='${Version}' guile-hoot)"
+          echo "guile-goblins=$GOBLINS"
+          echo "guile-hoot=$HOOT"
+          case "$GOBLINS" in
+            0.18.0-*) ;;
+            *) echo "Expected Goblins 0.18.0 package family" >&2; exit 2 ;;
+          esac
+          case "$HOOT" in
+            0.9.0-*) ;;
+            *) echo "Expected Hoot 0.9.0 package family" >&2; exit 2 ;;
+          esac
+      - name: Run two-node CapTP WebSocket capability test
+        run: |
+          guile -L networking/spritely             networking/spritely/tests/captp-websocket-two-node.scm
+      - name: Compile browser Goblins graph with Hoot
+        run: |
+          mkdir -p build/spritely
+          hoot compile --bundle             -L networking/spritely             -o build/spritely/starjunk-room.wasm             networking/spritely/hoot-room-smoke.scm
+          test -s build/spritely/starjunk-room.wasm
+          find build/spritely -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
       - uses: actions/upload-artifact@v4
-        if: success()
         with:
           name: spritely-hoot-room-smoke
           path: build/spritely/
