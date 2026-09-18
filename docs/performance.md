@@ -8,6 +8,8 @@ Performance is a continuous product constraint.
 
 Do not simplify it merely to make numbers look better. Add representative signature effects as the game evolves.
 
+The authoritative `default` profile retains the full workload. Hosted browser CI runs a `browser_smoke` density profile that keeps the same feature classes (instancing, dynamic lights/shadows, emission/glow, transparency, GPU particles and ribbon particle trails) at reduced counts because GitHub-hosted Chromium uses software WebGPU. Smoke results are correctness evidence only and must never become performance baselines.
+
 ## Result identity
 
 Results are comparable only when these match:

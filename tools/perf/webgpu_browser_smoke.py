@@ -102,6 +102,9 @@ def main() -> int:
     parser.add_argument("--root", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--timeout", type=float, default=90.0)
+    parser.add_argument("--result-global", default="__STARJUNK_PERF_RESULT__")
+    parser.add_argument("--purpose", default="browser_webgpu_smoke")
+    parser.add_argument("--expected-profile", default="")
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
@@ -184,31 +187,52 @@ def main() -> int:
             raise RuntimeError(f"WebGPU adapter unavailable: {adapter_probe}")
 
         deadline = time.monotonic() + args.timeout
-        benchmark = None
+        payload = None
+        result_expression = f"window[{json.dumps(args.result_global)}] || null"
         while time.monotonic() < deadline:
-            benchmark = cdp.evaluate("window.__STARJUNK_PERF_RESULT__ || null")
-            if benchmark is not None:
+            payload = cdp.evaluate(result_expression)
+            if payload is not None:
                 break
             time.sleep(0.5)
-        if benchmark is None:
-            raise TimeoutError("Godot WebGPU benchmark did not publish a result")
+        if payload is None:
+            diagnostics = cdp.evaluate("""({
+                ready_state: document.readyState,
+                title: document.title,
+                body_text: (document.body && document.body.innerText || "").slice(0, 4000),
+                location: location.href,
+                starjunk_globals: Object.keys(window).filter(k => k.includes("STARJUNK")).sort()
+            })""")
+            failure_result = {
+                "schema_version": 1,
+                "authoritative_performance": False,
+                "purpose": args.purpose,
+                "browser": Path(chrome).name,
+                "adapter_probe": adapter_probe,
+                "diagnostics": diagnostics,
+                "error": f"Timed out waiting for window.{args.result_global}",
+            }
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(json.dumps(failure_result, indent=2) + "\n", encoding="utf-8")
+            raise TimeoutError(f"Godot WebGPU result {args.result_global!r} was not published")
 
-        renderer = str(benchmark.get("renderer", "")).lower()
-        driver = str(benchmark.get("rendering_driver", "")).lower()
+        renderer = str(payload.get("renderer", "")).lower()
+        driver = str(payload.get("rendering_driver", "")).lower()
         if renderer != "mobile":
             raise RuntimeError(f"Expected Mobile renderer, got {renderer!r}")
         if "webgpu" not in driver:
             raise RuntimeError(f"Expected WebGPU rendering driver, got {driver!r}")
-        if benchmark.get("profile") != "browser_smoke":
-            raise RuntimeError(f"Expected browser_smoke profile, got {benchmark.get('profile')!r}")
+        if args.expected_profile and payload.get("profile") != args.expected_profile:
+            raise RuntimeError(
+                f"Expected profile {args.expected_profile!r}, got {payload.get('profile')!r}"
+            )
 
         result = {
             "schema_version": 1,
             "authoritative_performance": False,
-            "purpose": "browser_webgpu_smoke",
+            "purpose": args.purpose,
             "browser": Path(chrome).name,
             "adapter_probe": adapter_probe,
-            "benchmark": benchmark,
+            "payload": payload,
         }
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")

@@ -1,7 +1,7 @@
 extends Node3D
 
 const SCENARIO := "renderer_torture"
-const SCENARIO_VERSION := 2
+const SCENARIO_VERSION := 3
 const DEFAULT_WARMUP := 180
 const DEFAULT_FRAMES := 600
 
@@ -20,10 +20,15 @@ var _frame_index := 0
 var _last_tick_usec := 0
 var _scene_time := 0.0
 var _pipeline_compilations_start := 0.0
+var _instance_count := 512
+var _light_count := 8
+var _track_segment_count := 48
+var _spark_particle_count := 4096
+var _trail_particle_count := 96
 
 func _ready() -> void:
-	_build_scene()
 	_configure_benchmark()
+	_build_scene()
 	_last_tick_usec = Time.get_ticks_usec()
 
 func _process(delta: float) -> void:
@@ -51,8 +56,13 @@ func _configure_benchmark() -> void:
 	_benchmarking = OS.has_feature("starjunk_renderer_benchmark") or user_args.has("--benchmark")
 	if OS.has_feature("starjunk_renderer_smoke"):
 		_profile = "browser_smoke"
-		_warmup_frames = 30
-		_sample_frames = 90
+		_warmup_frames = 12
+		_sample_frames = 24
+		_instance_count = 96
+		_light_count = 4
+		_track_segment_count = 24
+		_spark_particle_count = 512
+		_trail_particle_count = 24
 	for arg in user_args:
 		if arg.begins_with("--warmup="):
 			_warmup_frames = max(1, int(arg.trim_prefix("--warmup=")))
@@ -85,9 +95,9 @@ func _build_scene() -> void:
 	sun.shadow_enabled = true
 	add_child(sun)
 
-	for i in range(8):
+	for i in range(_light_count):
 		var light := OmniLight3D.new()
-		var angle := TAU * float(i) / 8.0
+		var angle := TAU * float(i) / float(_light_count)
 		light.position = Vector3(cos(angle) * 11.0, 2.4, sin(angle) * 11.0)
 		light.omni_range = 9.0
 		light.light_energy = 3.0
@@ -105,7 +115,7 @@ func _build_instanced_field() -> void:
 	var multimesh_instance := MultiMeshInstance3D.new()
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
-	multimesh.instance_count = 512
+	multimesh.instance_count = _instance_count
 	var mesh := BoxMesh.new()
 	mesh.size = Vector3(0.35, 0.35, 0.35)
 	var material := StandardMaterial3D.new()
@@ -124,7 +134,7 @@ func _build_instanced_field() -> void:
 	add_child(multimesh_instance)
 
 func _build_track() -> void:
-	for i in range(48):
+	for i in range(_track_segment_count):
 		var segment := MeshInstance3D.new()
 		var mesh := BoxMesh.new()
 		mesh.size = Vector3(2.0, 0.18, 2.0)
@@ -137,14 +147,14 @@ func _build_track() -> void:
 		material.emission_energy_multiplier = 1.4
 		mesh.material = material
 		segment.mesh = mesh
-		var angle := TAU * float(i) / 48.0
+		var angle := TAU * float(i) / float(_track_segment_count)
 		segment.position = Vector3(cos(angle) * 8.5, 0.0, sin(angle) * 8.5)
 		segment.rotation.y = -angle
 		add_child(segment)
 
 func _build_particles() -> void:
 	var particles := GPUParticles3D.new()
-	particles.amount = 4096
+	particles.amount = _spark_particle_count
 	particles.lifetime = 2.8
 	particles.visibility_aabb = AABB(Vector3(-24, -6, -24), Vector3(48, 20, 48))
 	particles.use_fixed_seed = true
@@ -174,7 +184,7 @@ func _build_particles() -> void:
 
 func _build_trail_particles() -> void:
 	var particles := GPUParticles3D.new()
-	particles.amount = 96
+	particles.amount = _trail_particle_count
 	particles.lifetime = 2.2
 	particles.trail_enabled = true
 	particles.trail_lifetime = 0.75
@@ -249,7 +259,7 @@ func _finish_benchmark() -> void:
 		"engine_hash": version_info.get("hash", ""),
 		"viewport_width": int(viewport_size.x),
 		"viewport_height": int(viewport_size.y),
-		"settings_hash": "rt-v2-512i-8l-4096p-96t-1280x720",
+		"settings_hash": _settings_hash(),
 		"sample_frames": _frame_times_ms.size(),
 		"frame_ms_mean": _mean(_frame_times_ms),
 		"frame_ms_p50": _percentile(_frame_times_ms, 0.50),
@@ -300,3 +310,8 @@ func _pipeline_compilation_count() -> float:
 		+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_DRAW)
 		+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SPECIALIZATION)
 	)
+
+func _settings_hash() -> String:
+	if _profile == "browser_smoke":
+		return "rt-v3-smoke-96i-4l-512p-24t-24s-1280x720"
+	return "rt-v3-full-512i-8l-4096p-96t-48s-1280x720"

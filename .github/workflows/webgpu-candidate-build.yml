@@ -10,6 +10,7 @@ on:
       - "tools/perf/webgpu_browser_smoke.py"
       - "game/export_presets.cfg"
       - "game/tests/perf/renderer_torture/**"
+      - "game/tests/perf/webgpu_boot/**"
       - ".github/workflows/webgpu-candidate-build.yml"
   workflow_dispatch:
 
@@ -51,6 +52,11 @@ jobs:
       - name: List build outputs
         if: always()
         run: find build/webgpu-port-candidate/godot/bin -maxdepth 1 -type f -printf '%f %s bytes\n' 2>/dev/null | sort || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: godot-4.7.2-webgpu-template
+          path: build/webgpu-port-candidate/godot/bin/godot.web.template_release.wasm32.nothreads.zip
+          if-no-files-found: error
       - name: Download upstream Godot editor for export
         env:
           GODOT_VERSION: "4.7.2"
@@ -61,22 +67,25 @@ jobs:
           echo "GODOT_BIN=/tmp/godot-editor/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "$GITHUB_ENV"
       - name: Install browser smoke dependency
         run: python3 -m pip install websocket-client
+      - name: Export lightweight Godot WebGPU boot scene
+        run: |
+          tools/engine/export_webgpu_benchmark.sh             "$GODOT_BIN"             "$GITHUB_WORKSPACE/build/webgpu-port-candidate/godot/bin/godot.web.template_release.wasm32.nothreads.zip"             "$GITHUB_WORKSPACE/build/webgpu-boot"             "res://tests/perf/webgpu_boot/webgpu_boot.tscn"
+      - name: Run Chromium Godot WebGPU boot gate
+        run: |
+          python3 tools/perf/webgpu_browser_smoke.py             --root build/webgpu-boot             --output build/webgpu-boot-smoke.json             --result-global __STARJUNK_BOOT_RESULT__             --purpose browser_webgpu_boot             --expected-profile boot             --timeout 30
+          cat build/webgpu-boot-smoke.json
       - name: Export Starjunk WebGPU renderer torture scene
         run: |
-          tools/engine/export_webgpu_benchmark.sh             "$GODOT_BIN"             "$GITHUB_WORKSPACE/build/webgpu-port-candidate/godot/bin/godot.web.template_release.wasm32.nothreads.zip"             "$GITHUB_WORKSPACE/build/web-benchmark"
-      - name: Run Chromium WebGPU smoke
+          tools/engine/export_webgpu_benchmark.sh             "$GODOT_BIN"             "$GITHUB_WORKSPACE/build/webgpu-port-candidate/godot/bin/godot.web.template_release.wasm32.nothreads.zip"             "$GITHUB_WORKSPACE/build/web-benchmark"             "res://tests/perf/renderer_torture/renderer_torture.tscn"
+      - name: Run Chromium WebGPU torture-feature smoke
         run: |
-          python3 tools/perf/webgpu_browser_smoke.py             --root build/web-benchmark             --output build/webgpu-browser-smoke.json             --timeout 90
+          python3 tools/perf/webgpu_browser_smoke.py             --root build/web-benchmark             --output build/webgpu-browser-smoke.json             --result-global __STARJUNK_PERF_RESULT__             --purpose browser_webgpu_torture_smoke             --expected-profile browser_smoke             --timeout 120
           cat build/webgpu-browser-smoke.json
-      - uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: godot-4.7.2-webgpu-template
-          path: build/webgpu-port-candidate/godot/bin/godot.web.template_release.wasm32.nothreads.zip
-          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: webgpu-browser-smoke
-          path: build/webgpu-browser-smoke.json
+          path: |
+            build/webgpu-boot-smoke.json
+            build/webgpu-browser-smoke.json
           if-no-files-found: warn
