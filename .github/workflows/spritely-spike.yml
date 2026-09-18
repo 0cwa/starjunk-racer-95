@@ -27,11 +27,20 @@ jobs:
 
               mkdir -p build/spritely
               GOBLINS_FILE="$(guile -c "(display (%search-load-path \"goblins.scm\"))")"
-              GOBLINS_LOAD_PATH="$(dirname "$GOBLINS_FILE")"
+              GOBLINS_SITE_ROOT="$(dirname "$GOBLINS_FILE")"
 
-              hoot compile                 -L "$GOBLINS_LOAD_PATH"                 --run                 networking/spritely/hoot_room_smoke.scm
+              # Debian installs Goblins and Hoot into the same Guile site root.
+              # Passing that whole directory to Hoot makes its library-group
+              # builder ingest Hoot's own host-side modules. Copy only Goblins
+              # into an isolated module root so -L contains guest libraries only.
+              GOBLINS_HOOT_ROOT=/tmp/starjunk-goblins-hoot
+              mkdir -p "$GOBLINS_HOOT_ROOT"
+              cp "$GOBLINS_FILE" "$GOBLINS_HOOT_ROOT/goblins.scm"
+              cp -a "$GOBLINS_SITE_ROOT/goblins" "$GOBLINS_HOOT_ROOT/goblins"
 
-              hoot compile                 -L "$GOBLINS_LOAD_PATH"                 --bundle=build/spritely                 -o build/spritely/starjunk-spritely-room.wasm                 networking/spritely/hoot_room_smoke.scm
+              hoot compile                 -L "$GOBLINS_HOOT_ROOT"                 --run                 networking/spritely/hoot_room_smoke.scm
+
+              hoot compile                 -L "$GOBLINS_HOOT_ROOT"                 --bundle=build/spritely                 -o build/spritely/starjunk-spritely-room.wasm                 networking/spritely/hoot_room_smoke.scm
 
               test -s build/spritely/starjunk-spritely-room.wasm
             '
