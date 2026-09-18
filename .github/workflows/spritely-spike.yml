@@ -1,0 +1,46 @@
+name: Spritely Capability Spike
+
+on:
+  push:
+    branches:
+      - networking/spritely-executable-spike
+    paths:
+      - "networking/**"
+      - ".github/workflows/spritely-spike.yml"
+  workflow_dispatch:
+
+jobs:
+  goblins-and-hoot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Goblins CapTP and Hoot compile probes
+        run: |
+          docker run --rm             -v "$GITHUB_WORKSPACE:/work"             -w /work             debian:sid             bash -lc '
+              set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y --no-install-recommends                 ca-certificates                 guile-3.0                 guile-goblins                 guile-hoot                 guile-websocket                 nodejs
+
+              guile -c "(use-modules (goblins)) (display "Goblins load OK\n")"
+              guile -c "(use-modules (hoot compile)) (display "Hoot load OK\n")"
+
+              timeout 60s guile networking/spritely/captp_room_smoke.scm
+
+              mkdir -p build/spritely
+              GOBLINS_FILE="$(guile -c "(display (%search-load-path \"goblins.scm\"))")"
+              GOBLINS_LOAD_PATH="$(dirname "$GOBLINS_FILE")"
+
+              hoot compile                 -L "$GOBLINS_LOAD_PATH"                 --run                 networking/spritely/hoot_room_smoke.scm
+
+              hoot compile                 -L "$GOBLINS_LOAD_PATH"                 --bundle=build/spritely                 -o build/spritely/starjunk-spritely-room.wasm                 networking/spritely/hoot_room_smoke.scm
+
+              test -s build/spritely/starjunk-spritely-room.wasm
+            '
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: spritely-hoot-room-smoke
+          path: build/spritely/
+          if-no-files-found: error
