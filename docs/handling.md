@@ -103,3 +103,6 @@ Wheel inertia, longitudinal stiffness, peak longitudinal slip and maximum angula
 
 
 The rotational integrator clamps tyre-reaction movement at the instantaneous rolling-speed equilibrium. This is a numerical stability rule, not traction control: drive torque may still push a driven wheel beyond rolling speed and brakes may still hold it below rolling speed, but an undriven tyre cannot overshoot from positive to negative slip solely because a 60 Hz explicit reaction-torque step was too large.
+
+
+The current prototype's drive-force ceiling is tuned so the characterization harness at 65% throttle operates near, but below, static rear-axle peak traction. Full throttle still exceeds static rear grip and can produce deliberate wheelspin. This is provisional until longitudinal load transfer is modeled.
