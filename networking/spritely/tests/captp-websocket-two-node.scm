@@ -39,9 +39,17 @@
   (with-vat host-vat
     (spawn ^race-room)))
 
-(define room-sref
-  (with-vat host-vat
-    ($ host-mycapn 'register room 'websocket)))
+;; Registration can depend on asynchronous netlayer startup. Exercise the
+;; public asynchronous path instead of assuming the netlayer is immediately
+;; ready for a synchronous local call.
+(define registered? (make-condition))
+(define room-sref #f)
+(with-vat host-vat
+  (on (<- host-mycapn 'register room 'websocket)
+      (lambda (sref)
+        (set! room-sref sref)
+        (signal-condition! registered?))))
+(wait registered?)
 
 (define room-sref-string (ocapn-id->string room-sref))
 (check (string-prefix? "ocapn://" room-sref-string)
@@ -73,7 +81,7 @@
                         (lambda (ready?)
                           (unless ready?
                             (set! failure "remote racer ready call failed"))
-                          (signal-condition! done?)))))))))
+                          (signal-condition! done?))))))))))
 
 (wait done?)
 
