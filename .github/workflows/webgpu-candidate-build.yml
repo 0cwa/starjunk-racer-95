@@ -1,0 +1,54 @@
+name: WebGPU 4.7.2 Candidate Build
+
+on:
+  push:
+    branches:
+      - engine/webgpu-port-spike
+    paths:
+      - "engine/**"
+      - "tools/engine/**"
+      - ".github/workflows/webgpu-candidate-build.yml"
+  workflow_dispatch:
+
+jobs:
+  web-template:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      EM_VERSION: "4.0.11"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set up Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ env.EM_VERSION }}
+          no-cache: true
+      - name: Install SCons
+        run: python3 -m pip install scons
+      - name: Prepare merged Godot 4.7.2 + WebGPU candidate
+        run: tools/engine/prepare_port_candidate.sh build/webgpu-port-candidate
+      - name: Compile WebGPU web template
+        run: |
+          scons -C build/webgpu-port-candidate/godot \
+            platform=web \
+            target=template_release \
+            threads=no \
+            opengl3=no \
+            webgpu=yes \
+            webgpu_backend=emdawnwebgpu \
+            dlink_enabled=no \
+            lto=none \
+            debug_symbols=no \
+            -j2
+      - name: List build outputs
+        if: always()
+        run: find build/webgpu-port-candidate/godot/bin -maxdepth 1 -type f -printf '%f %s bytes\n' 2>/dev/null | sort || true
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: godot-4.7.2-webgpu-template
+          path: build/webgpu-port-candidate/godot/bin/*
+          if-no-files-found: error
