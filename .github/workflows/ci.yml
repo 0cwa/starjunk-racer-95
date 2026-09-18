@@ -37,6 +37,8 @@ jobs:
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/wheel_slip_kinematics_test.tscn'
       - name: Run suspension model tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/suspension_model_test.tscn'
+      - name: Run raycast vehicle integration test
+        run: '"$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/raycast_vehicle_test.tscn'
       - name: Run community package safety tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/content_package_test.tscn'
       - name: Load renderer torture scene
