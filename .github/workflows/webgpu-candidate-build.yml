@@ -30,6 +30,8 @@ jobs:
         run: python3 -m pip install scons
       - name: Prepare merged Godot 4.7.2 + WebGPU candidate
         run: tools/engine/prepare_port_candidate.sh build/webgpu-port-candidate
+      - name: Build pinned Rust shader dependencies for Emscripten
+        run: tools/engine/build_webgpu_rust_deps.sh build/webgpu-port-candidate/godot build/webgpu-rust-deps
       - name: Compile WebGPU web template
         run: |
           scons -C build/webgpu-port-candidate/godot \
