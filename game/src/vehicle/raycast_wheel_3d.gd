@@ -71,12 +71,17 @@ func sample_and_apply(
 	var lateral_speed := point_velocity.dot(wheel_right)
 	var slip_angle := WheelSlipKinematics.slip_angle_rad(longitudinal_speed, lateral_speed)
 
+	var slide_grip_ratio := HandlingAssistModel.slide_grip_ratio(
+		TireForceModel.DEFAULT_SLIDE_GRIP_RATIO,
+		float(handling["grip_recovery_assist"])
+	)
 	var lateral_force := TireForceModel.lateral_force_n(
 		slip_angle,
 		normal_force,
 		float(handling["base_grip_coefficient"]),
 		float(handling["cornering_stiffness"]),
-		float(handling["peak_slip_angle_deg"])
+		float(handling["peak_slip_angle_deg"]),
+		slide_grip_ratio
 	)
 
 	var longitudinal_force := drive_force_request_n
@@ -103,6 +108,7 @@ func sample_and_apply(
 		"longitudinal_speed_mps": longitudinal_speed,
 		"lateral_speed_mps": lateral_speed,
 		"slip_angle_rad": slip_angle,
+		"slide_grip_ratio": slide_grip_ratio,
 		"longitudinal_force_n": combined.x,
 		"lateral_force_n": combined.y,
 	}
