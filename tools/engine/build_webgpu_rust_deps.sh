@@ -63,9 +63,11 @@ export CC_wasm32_unknown_emscripten=emcc
 export CXX_wasm32_unknown_emscripten=em++
 export AR_wasm32_unknown_emscripten=emar
 
-# Keep the translator minimal: Godot only needs SPIR-V input, validation and
-# WGSL output from this C FFI library.
-cargo build   --manifest-path "$WORK_ROOT/naga-native/Cargo.toml"   --release   --locked   --target wasm32-unknown-emscripten   --no-default-features   --features spv-in,wgsl-out
+# naga-native's shared conversion module currently references types from every
+# Naga front/back end even though exported functions are feature-gated. Build
+# the pinned default feature set for correctness; a future narrow FFI wrapper
+# can reduce size once this renderer path is proven.
+cargo build --manifest-path "$WORK_ROOT/naga-native/Cargo.toml" --release --locked --target wasm32-unknown-emscripten
 
 cargo build   --manifest-path "$WORK_ROOT/spirv-webgpu-transform/ffi/Cargo.toml"   --release   --locked   --target wasm32-unknown-emscripten
 
