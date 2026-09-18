@@ -6,7 +6,7 @@ Performance is a continuous product constraint.
 
 `game/tests/perf/renderer_torture/` is a permanent scene that intentionally stresses the visual language we expect to use in real tracks: instancing, dynamic lights, emission/glow, transparency, GPU particles and particle trails.
 
-Do not simplify it merely to make numbers look better. Add representative signature effects as the game evolves.
+Do not simplify it merely to make numbers look better. Add representative signature effects as the game evolves. Scene motion uses accumulated simulation time rather than wall-clock time so each run traverses the same animation path.
 
 ## Result identity
 
@@ -18,6 +18,8 @@ Results are comparable only when these match:
 - renderer and rendering driver;
 - runner identity/GPU class;
 - resolution and relevant quality settings.
+
+The result also records the exact Godot version/hash, CPU-side process/physics p95 times, pipeline compilations during the measured window, and rendering memory counters. Engine version is evidence, not an identity constraint: performance comparisons are specifically meant to compare different game/engine revisions on the same runner.
 
 The comparison tool rejects mismatched identities.
 
