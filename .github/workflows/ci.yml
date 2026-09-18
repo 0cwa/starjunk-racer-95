@@ -56,6 +56,8 @@ jobs:
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/race_protocol_test.tscn'
       - name: Run community package safety tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/content_package_test.tscn'
+      - name: Run safe package archive staging tests
+        run: 'timeout 30s "$GODOT_BIN" --headless --path game res://tests/unit/community_package_archive_test.tscn'
       - name: Run community car runtime importer tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/community_car_importer_test.tscn'
       - name: Run community track runtime importer tests
