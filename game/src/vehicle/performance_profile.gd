@@ -13,6 +13,14 @@ extends Resource
 @export_range(1000.0, 30000.0, 10.0) var max_drive_force_n: float = 9200.0
 @export_range(1000.0, 40000.0, 10.0) var max_brake_force_n: float = 14500.0
 
+@export_group("Suspension")
+@export_range(0.05, 1.0, 0.001) var suspension_rest_length_m: float = 0.34
+@export_range(0.02, 0.5, 0.001) var suspension_travel_m: float = 0.18
+@export_range(1000.0, 100000.0, 10.0) var suspension_spring_rate_n_per_m: float = 26000.0
+@export_range(0.0, 20000.0, 10.0) var suspension_bump_damping_n_s_per_m: float = 3200.0
+@export_range(0.0, 20000.0, 10.0) var suspension_rebound_damping_n_s_per_m: float = 4300.0
+@export_range(1000.0, 100000.0, 10.0) var max_suspension_force_n: float = 16000.0
+
 @export_group("Tyre personality")
 @export_range(0.1, 3.0, 0.001) var base_grip_coefficient: float = 1.08
 @export_range(1000.0, 80000.0, 10.0) var base_cornering_stiffness: float = 28000.0
@@ -35,6 +43,18 @@ func validate() -> PackedStringArray:
 		problems.append("max_drive_force_n must be positive")
 	if max_brake_force_n <= 0.0:
 		problems.append("max_brake_force_n must be positive")
+	if suspension_rest_length_m <= 0.0:
+		problems.append("suspension_rest_length_m must be positive")
+	if suspension_travel_m <= 0.0:
+		problems.append("suspension_travel_m must be positive")
+	if suspension_spring_rate_n_per_m <= 0.0:
+		problems.append("suspension_spring_rate_n_per_m must be positive")
+	if suspension_bump_damping_n_s_per_m < 0.0:
+		problems.append("suspension_bump_damping_n_s_per_m must not be negative")
+	if suspension_rebound_damping_n_s_per_m < 0.0:
+		problems.append("suspension_rebound_damping_n_s_per_m must not be negative")
+	if max_suspension_force_n <= 0.0:
+		problems.append("max_suspension_force_n must be positive")
 	if base_grip_coefficient <= 0.0:
 		problems.append("base_grip_coefficient must be positive")
 	if base_cornering_stiffness <= 0.0:

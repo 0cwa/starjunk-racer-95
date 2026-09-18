@@ -51,3 +51,13 @@ Lateral slip angle uses velocity in the wheel's **steered local frame** and floo
 Longitudinal slip compares wheel circumferential speed with road speed using a symmetric, low-speed-safe denominator. Pure rolling is zero, a locked wheel under forward motion is -1, and driven-wheel overspeed is positive.
 
 The future wheel controller is responsible for transforming the rigid body's point velocity into each steered wheel frame before using these helpers.
+
+## Suspension model
+
+Suspension parameters are trusted performance-profile values and do **not** change with the realism slider.
+
+`SuspensionModel` converts ray-contact distance into bounded compression, derives compression velocity, then computes a one-way spring/damper normal force. Separate bump and rebound damping let profiles control landing/compression response versus extension response.
+
+The force is clamped at zero so the suspension never pulls the chassis toward the road, and at a profile maximum so extreme contact events cannot create unbounded impulses.
+
+The future raycast wheel adapter should retain previous compression per wheel, call this model each physics tick, and feed its normal load into `TireForceModel`.
