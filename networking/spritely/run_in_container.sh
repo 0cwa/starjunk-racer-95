@@ -4,7 +4,7 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
-apt-get install -y --no-install-recommends   ca-certificates   guile-3.0   guile-goblins   guile-hoot   guile-websocket   nodejs
+apt-get install -y --no-install-recommends   ca-certificates   guile-3.0   guile-goblins   guile-hoot   guile-websocket   nodejs   wabt
 
 timeout 60s guile networking/spritely/captp_room_smoke.scm
 
@@ -24,8 +24,13 @@ mkdir -p "$GOBLINS_HOOT_ROOT"
 cp "$GOBLINS_FILE" "$GOBLINS_HOOT_ROOT/goblins.scm"
 cp -a "$GOBLINS_SITE_ROOT/goblins" "$GOBLINS_HOOT_ROOT/goblins"
 
-hoot compile   -L "$GOBLINS_HOOT_ROOT"   --run   networking/spritely/hoot_room_smoke.scm
-
+# Hoot's local --run VM does not provide Goblins' browser host imports
+# (for example crypto.signEd25519). Compilation is the browser portability
+# gate here; runtime host imports will be validated in an actual browser.
 hoot compile   -L "$GOBLINS_HOOT_ROOT"   --bundle=build/spritely   -o build/spritely/starjunk-spritely-room.wasm   networking/spritely/hoot_room_smoke.scm
 
 test -s build/spritely/starjunk-spritely-room.wasm
+
+# Capture the exact host import contract emitted by the pinned Goblins/Hoot pair.
+wasm-objdump -x build/spritely/starjunk-spritely-room.wasm > build/spritely/starjunk-spritely-room.imports.txt
+grep -q "crypto" build/spritely/starjunk-spritely-room.imports.txt
