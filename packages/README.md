@@ -15,3 +15,5 @@ The `starjunk95/*/1` formats are deliberately engine-independent public contract
 - Imported packages should be treated as untrusted input before any files are opened or instantiated.
 
 The JSON schemas define portable structure. The Godot-side loader adds runtime policy checks that schemas alone cannot express, such as whether a requested performance profile is trusted by this game version.
+
+- Runtime track import separates visual GLB from collision GLB. Collision meshes become game-created static trimesh shapes; checkpoint/spawn nodes are generated from validated manifest data.

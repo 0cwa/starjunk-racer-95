@@ -80,10 +80,61 @@ func _validate_track(manifest: Dictionary) -> Dictionary:
 
 	if not manifest["checkpoints"] is Array or manifest["checkpoints"].size() < 2:
 		return _error("Track requires at least two checkpoints")
+	var checkpoint_ids := {}
+	for index in range(manifest["checkpoints"].size()):
+		var checkpoint = manifest["checkpoints"][index]
+		if not checkpoint is Dictionary:
+			return _error("checkpoint %d must be an object" % index)
+		for key in ["id", "position", "size"]:
+			if not checkpoint.has(key):
+				return _error("checkpoint %d missing %s" % [index, key])
+		var checkpoint_id := str(checkpoint["id"])
+		if checkpoint_id.is_empty() or checkpoint_id.length() > 96:
+			return _error("checkpoint %d has invalid id" % index)
+		if checkpoint_ids.has(checkpoint_id):
+			return _error("checkpoint ids must be unique")
+		checkpoint_ids[checkpoint_id] = true
+		var position_error := _validate_vec3("checkpoint %d position" % index, checkpoint["position"], false)
+		if not position_error.is_empty():
+			return _error(position_error)
+		var size_error := _validate_vec3("checkpoint %d size" % index, checkpoint["size"], true)
+		if not size_error.is_empty():
+			return _error(size_error)
+		if checkpoint.has("rotation_degrees"):
+			var rotation_error := _validate_vec3("checkpoint %d rotation_degrees" % index, checkpoint["rotation_degrees"], false)
+			if not rotation_error.is_empty():
+				return _error(rotation_error)
+
 	if not manifest["spawn_points"] is Array or manifest["spawn_points"].is_empty():
 		return _error("Track requires at least one spawn point")
+	for index in range(manifest["spawn_points"].size()):
+		var spawn = manifest["spawn_points"][index]
+		if not spawn is Dictionary:
+			return _error("spawn point %d must be an object" % index)
+		for key in ["position", "rotation_degrees"]:
+			if not spawn.has(key):
+				return _error("spawn point %d missing %s" % [index, key])
+		var position_error := _validate_vec3("spawn point %d position" % index, spawn["position"], false)
+		if not position_error.is_empty():
+			return _error(position_error)
+		var rotation_error := _validate_vec3("spawn point %d rotation_degrees" % index, spawn["rotation_degrees"], false)
+		if not rotation_error.is_empty():
+			return _error(rotation_error)
 
 	return {"ok": true, "kind": "track", "manifest": manifest.duplicate(true)}
+
+func _validate_vec3(label: String, value: Variant, require_positive: bool) -> String:
+	if not value is Array or value.size() != 3:
+		return "%s must contain exactly three numbers" % label
+	for component in value:
+		if not (component is int or component is float):
+			return "%s must contain only numbers" % label
+		var numeric := float(component)
+		if not is_finite(numeric):
+			return "%s must contain only finite numbers" % label
+		if require_positive and numeric <= 0.0:
+			return "%s components must be positive" % label
+	return ""
 
 func _validate_package_asset_path(label: String, value: Variant, allowed_extensions: Array[String]) -> String:
 	var path_error := _validate_relative_asset_path(label, value)

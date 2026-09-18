@@ -41,3 +41,15 @@ If programmable mods are introduced, they must run in a sandbox with explicit ca
 ## Decentralized sharing
 
 Spritely-style object capabilities are a natural fit for sharing/forking/publishing content references. Storage/distribution details must remain behind the content service boundary so packages can also be imported from local files.
+
+
+## Runtime track import
+
+`CommunityTrackImporter` loads generation-1 custom tracks from two self-contained GLBs plus declarative race metadata.
+
+- The **environment GLB** is visual-only and receives the same script/camera/light/collision sanitization as community car visuals.
+- The **collision GLB** is never inserted as a scene. Its triangle meshes are converted into game-created `ConcavePolygonShape3D` nodes under a single `StaticBody3D`, with a hard shape-count cap.
+- **Checkpoints** are game-created `Area3D` boxes from manifest IDs, transforms and sizes.
+- **Spawn points** are game-created transforms from the manifest.
+
+This means track authors control the physical road geometry—as they must for custom tracks—but still do not supply executable Godot scenes, scripts, cameras or arbitrary physics objects.
