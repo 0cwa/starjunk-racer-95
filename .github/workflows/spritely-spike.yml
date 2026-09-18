@@ -44,8 +44,10 @@ jobs:
           guile -L networking/spritely             networking/spritely/tests/captp-websocket-two-node.scm
       - name: Compile browser Goblins graph with Hoot
         run: |
-          mkdir -p build/spritely
-          hoot compile --bundle             -L networking/spritely             -L /usr/share/guile/site/3.0             -o build/spritely/starjunk-room.wasm             networking/spritely/hoot-room-smoke.scm
+          mkdir -p build/spritely build/hoot-goblins
+          cp /usr/share/guile/site/3.0/goblins.scm build/hoot-goblins/
+          cp -a /usr/share/guile/site/3.0/goblins build/hoot-goblins/
+          hoot compile --bundle             -L networking/spritely             -L build/hoot-goblins             -o build/spritely/starjunk-room.wasm             networking/spritely/hoot-room-smoke.scm
           test -s build/spritely/starjunk-room.wasm
           find build/spritely -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
       - uses: actions/upload-artifact@v4
