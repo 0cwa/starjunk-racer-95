@@ -26,6 +26,10 @@ func set_controls(throttle: float, brake: float, steer: float) -> void:
 	if not is_zero_approx(throttle_input) or brake_input > 0.0 or not is_zero_approx(steer_input):
 		sleeping = false
 
+func reset_wheel_rotation_states(longitudinal_speed_mps: float = 0.0) -> void:
+	for wheel in _wheels:
+		wheel.reset_rotation_state(longitudinal_speed_mps)
+
 func grounded_wheel_count() -> int:
 	var count := 0
 	for sample in last_wheel_samples:

@@ -72,7 +72,7 @@ The future raycast wheel adapter should retain previous compression per wheel, c
 4. `TireForceModel` produces lateral force and clamps it together with requested drive/brake force;
 5. Godot receives the resulting positioned force.
 
-The prototype currently uses rear-wheel drive, front-wheel steering, direct requested longitudinal force, and does not yet simulate wheel rotational inertia or apply the arcade assist terms. Those are explicit next steps, not hidden approximations.
+The prototype uses rear-wheel drive and front-wheel steering. Each wheel now owns angular velocity and rotational inertia: drive/brake requests become torques, longitudinal slip produces tyre force, and the actual friction-ellipse-clamped force feeds reaction torque back into the wheel. This permits wheelspin and lockup without introducing a second handling model.
 
 The integration test builds a flat road and four-wheel car entirely in code, lets it settle on its suspension, then applies throttle and requires forward motion without non-finite state. CI uses `--fixed-fps 60` so the physics frames execute deterministically without real-time waiting.
 
@@ -91,3 +91,12 @@ At lower realism values:
 These are race-wide feel settings in competitive multiplayer. They do not change mass, drive force, brake force, dimensions, suspension values, or the peak tyre-friction envelope.
 
 `drift_entry_assist` is still intentionally unused; it should not be wired until we can validate its effect with drift-entry telemetry instead of adding hidden yaw impulses by feel.
+
+
+## Wheel rotation and longitudinal slip
+
+`WheelRotationModel` is a pure angular integrator. Drive torque, tyre reaction torque and angular damping are integrated first; brake torque then removes angular speed without numerically driving the wheel through zero. A trusted maximum angular speed bounds pathological airborne spin.
+
+`RaycastWheel3D` computes longitudinal slip from contact-patch road speed versus wheel circumferential speed. `TireForceModel.longitudinal_force_n` uses the same shaped peak/post-peak philosophy as the lateral curve. The requested longitudinal and lateral forces still share one friction ellipse, so wheelspin does not create extra grip.
+
+Wheel inertia, longitudinal stiffness, peak longitudinal slip and maximum angular speed are trusted performance-profile values and are independent of the realism slider. The race-wide realism setting may raise post-peak recovery grip for easier slide recovery, but it does not change the peak friction envelope.
