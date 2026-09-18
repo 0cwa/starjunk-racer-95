@@ -20,6 +20,7 @@ var realism_label: Label
 var _camera: Camera3D
 var _spawn_transform := Transform3D.IDENTITY
 var _checkpoint_areas: Array[Area3D] = []
+var _wheel_visuals: Array[Dictionary] = []
 var _next_checkpoint := 0
 var _lap := 0
 var _camera_initialized := false
@@ -56,6 +57,7 @@ func _physics_process(_delta: float) -> void:
 
 func _process(delta: float) -> void:
 	_update_camera(delta)
+	_update_wheel_visuals(delta)
 	_update_hud()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -79,6 +81,10 @@ func reset_vehicle() -> void:
 	vehicle.linear_velocity = Vector3.ZERO
 	vehicle.angular_velocity = Vector3.ZERO
 	vehicle.set_controls(0.0, 0.0, 0.0)
+	vehicle.reset_wheel_rotation_states(0.0)
+	for entry in _wheel_visuals:
+		var pivot: Node3D = entry["pivot"]
+		pivot.rotation = Vector3.ZERO
 	vehicle.sleeping = false
 	_next_checkpoint = 0
 
@@ -231,6 +237,7 @@ func _build_checkpoints() -> void:
 		_checkpoint_areas.append(area)
 
 func _build_vehicle() -> void:
+	_wheel_visuals.clear()
 	var profile: VehiclePerformanceProfile = load("res://src/vehicle/profiles/prototype_balanced_01.tres")
 	vehicle = RaycastVehicleController.new()
 	vehicle.name = "PlayerCar"
@@ -280,6 +287,11 @@ func _add_wheel(position: Vector3, steerable: bool, driven: bool) -> void:
 	wheel.driven = driven
 	vehicle.add_child(wheel)
 
+	var visual_pivot := Node3D.new()
+	visual_pivot.name = "WheelVisualPivot%02d" % _wheel_visuals.size()
+	visual_pivot.position = position + Vector3.DOWN * 0.18
+	vehicle.add_child(visual_pivot)
+
 	var wheel_visual := MeshInstance3D.new()
 	var wheel_mesh := CylinderMesh.new()
 	wheel_mesh.top_radius = 0.31
@@ -292,8 +304,8 @@ func _add_wheel(position: Vector3, steerable: bool, driven: bool) -> void:
 	wheel_mesh.material = wheel_material
 	wheel_visual.mesh = wheel_mesh
 	wheel_visual.rotation_degrees.z = 90.0
-	wheel_visual.position = position + Vector3.DOWN * 0.18
-	vehicle.add_child(wheel_visual)
+	visual_pivot.add_child(wheel_visual)
+	_wheel_visuals.append({"wheel": wheel, "pivot": visual_pivot})
 
 func _build_camera() -> void:
 	_camera = Camera3D.new()
@@ -368,6 +380,16 @@ func _update_camera(delta: float) -> void:
 		var blend := 1.0 - exp(-7.0 * maxf(delta, 0.0))
 		_camera.global_position = _camera.global_position.lerp(desired, blend)
 	_camera.look_at(vehicle.global_position + Vector3.UP * 0.7)
+
+func _update_wheel_visuals(delta: float) -> void:
+	for entry in _wheel_visuals:
+		var wheel: RaycastWheel3D = entry["wheel"]
+		var pivot: Node3D = entry["pivot"]
+		pivot.rotation.x = wrapf(
+			pivot.rotation.x + wheel.wheel_angular_speed_rad_s * delta,
+			-PI,
+			PI
+		)
 
 func _update_hud() -> void:
 	if vehicle == null:
