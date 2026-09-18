@@ -7,7 +7,7 @@
   },
   "hoot": {
     "version": "0.9.0",
-    "release_family": "https://files.spritely.institute/releases/guile-hoot/"
+    "release": "https://files.spritely.institute/releases/guile-hoot/guile-hoot-0.9.0.tar.gz"
   },
   "starjunk_control_protocol": "starjunk95/race-control/1",
   "starjunk_realtime_protocol": "starjunk95/race-state/1"
