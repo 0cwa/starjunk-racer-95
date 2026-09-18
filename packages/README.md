@@ -6,9 +6,11 @@ The `starjunk95/*/1` formats are deliberately engine-independent public contract
 
 - Manifests are JSON.
 - 3D payloads are GLB.
+- GLBs must be self-contained: non-`data:` external URI dependencies are rejected at runtime.
 - Asset paths are package-relative POSIX paths.
 - Absolute paths, drive-qualified paths, backslashes, `.` and `..` path components are rejected.
 - Car packages select a game-owned `performance_profile`; they cannot ship competitive physics.
+- Imported car models are visual-only; collision/physics authority remains game-owned.
 - Track packages declare geometry and race structure, not arbitrary GDScript.
 - Imported packages should be treated as untrusted input before any files are opened or instantiated.
 

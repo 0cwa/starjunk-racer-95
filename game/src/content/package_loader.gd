@@ -29,6 +29,20 @@ func resolve_car_performance_profile(manifest: Dictionary) -> VehiclePerformance
 		return null
 	return PerformanceProfileRegistry.load_profile(StringName(str(manifest["performance_profile"])))
 
+func resolve_package_asset_path(package_root: String, relative_path: Variant) -> Dictionary:
+	var path_error := _validate_relative_asset_path("asset", relative_path)
+	if not path_error.is_empty():
+		return _error(path_error)
+	if package_root.is_empty():
+		return _error("package root must not be empty")
+
+	var root := package_root.simplify_path().trim_suffix("/")
+	var candidate := root.path_join(str(relative_path)).simplify_path()
+	var required_prefix := root + "/"
+	if not candidate.begins_with(required_prefix):
+		return _error("asset path escaped package root")
+	return {"ok": true, "path": candidate}
+
 func _validate_car(manifest: Dictionary) -> Dictionary:
 	for key in ["name", "model", "performance_profile"]:
 		if not manifest.has(key):
@@ -72,6 +86,16 @@ func _validate_track(manifest: Dictionary) -> Dictionary:
 	return {"ok": true, "kind": "track", "manifest": manifest.duplicate(true)}
 
 func _validate_package_asset_path(label: String, value: Variant, allowed_extensions: Array[String]) -> String:
+	var path_error := _validate_relative_asset_path(label, value)
+	if not path_error.is_empty():
+		return path_error
+	var lower_path := str(value).to_lower()
+	for extension in allowed_extensions:
+		if lower_path.ends_with(extension):
+			return ""
+	return "%s has an unsupported file extension" % label
+
+func _validate_relative_asset_path(label: String, value: Variant) -> String:
 	if not value is String:
 		return "%s must be a string path" % label
 
@@ -83,19 +107,10 @@ func _validate_package_asset_path(label: String, value: Variant, allowed_extensi
 	if path.begins_with("/") or path.begins_with("~") or path.contains(":"):
 		return "%s must be relative to the package root" % label
 
-	var components := path.split("/", false)
+	var components := path.split("/", true)
 	for component in components:
 		if component == "." or component == ".." or component.is_empty():
 			return "%s contains an unsafe path component" % label
-
-	var lower_path := path.to_lower()
-	var extension_allowed := false
-	for extension in allowed_extensions:
-		if lower_path.ends_with(extension):
-			extension_allowed = true
-			break
-	if not extension_allowed:
-		return "%s has an unsupported file extension" % label
 	return ""
 
 func _error(message: String) -> Dictionary:

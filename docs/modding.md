@@ -24,6 +24,16 @@ A car's `performance_profile` must exist in `PerformanceProfileRegistry`. Commun
 
 Archive extraction, when added, must independently enforce the same no-traversal rule before writing files.
 
+## Runtime car visual import
+
+`CommunityCarImporter` now loads a validated car GLB at runtime.
+
+The importer reads the GLB bytes itself, enforces a size cap, inspects the GLB JSON chunk, and rejects any non-`data:` URI. It then calls `GLTFDocument.append_from_buffer` with an empty base path, so the import cannot roam the filesystem for sidecar assets.
+
+After Godot generates the scene, the importer removes scripts, animation players, cameras, lights, audio nodes, ray/shape casts and collision nodes. Generation-1 community cars therefore contribute a visual node tree only. The caller receives that visual tree together with a separately resolved trusted `VehiclePerformanceProfile`.
+
+This is deliberately asymmetric: custom geometry is open; competitive collision and physics are not supplied by the package.
+
 ## Future programmable mods
 
 If programmable mods are introduced, they must run in a sandbox with explicit capabilities, such as reading beat timing or spawning cosmetic particles. They must not receive ambient filesystem/network authority or permission to alter authoritative race results.
