@@ -1,49 +1,37 @@
 # Godot WebGPU 4.7.2 forward-port plan
 
-The primary `dwalter/godotwebgpu` implementation is a valuable browser-first reference, but it is based on Godot 4.6.2 and contains a large accumulated delta. The newer `davnotdev/godot` WebGPU branch is our preferred **bridge** into 4.7-era engine interfaces, while the Walter implementation remains the primary reference for browser correctness, Mobile-renderer behavior and performance techniques.
+The primary `dwalter/godotwebgpu` implementation remains the browser-correctness/performance reference. It is based on Godot 4.6.2. The newer `davnotdev/godot` WebGPU branch is our preferred bridge into 4.7-era interfaces.
 
 ## Pinned references
 
-See `engine/source-lock.json`. Never forward-port from a floating branch.
+See `engine/source-lock.json`. Never forward-port from floating branches.
 
-The 2026-09-18 reconnaissance found merge base `e06dd8106e4c9113f2a3b20e4ceef16f3e85735e`. GitHub reports 110 WebGPU-side commits absent from 4.7.2 and 802 4.7.2-side commits absent from that branch.
+The 2026-09-18 reconnaissance found merge base `e06dd8106e4c9113f2a3b20e4ceef16f3e85735e`. Our Actions probe merges pinned WebGPU commit `2502ae7...` into pinned Godot 4.7.2 `ed1daf0...` cleanly with zero conflicts.
 
-More importantly, our Actions probe merged pinned WebGPU commit `2502ae7...` into pinned Godot 4.7.2 commit `ed1daf0...` **cleanly with zero merge conflicts**. This is only a source-merge result; compilation and rendering correctness are separate gates.
+## Toolchain finding
+
+The first candidate build used Emscripten 4.0.11 because that is the polished Walter fork's documented toolchain. Compilation reached the WebGPU driver but failed because the September 2026 davnotdev source expects a newer WebGPU C API (instance features, texture-format tiers and texture-component swizzles).
+
+The candidate therefore pins Emscripten **6.0.9**, released 2026-09-01, which is contemporary with the pinned 2026-09-02 davnotdev commit. Toolchain revisions are part of the candidate identity and must remain pinned.
+
+Godot 4.7 also added `swap_chain_get_hdr_output_supported()` to `RenderingDeviceDriver`. Our first explicit compatibility shim returns false for WebGPU, matching the driver's existing `SUPPORTS_HDR_OUTPUT = false` behavior until browser HDR surface negotiation is deliberately implemented.
 
 ## Repeatable probes
 
-- `tools/engine/forward_port_probe.sh` performs the merge and emits a conflict inventory.
-- `tools/engine/prepare_port_candidate.sh` reconstructs the clean merged tree for compilation.
-- `WebGPU 4.7.2 Candidate Build` compiles a web template against Emscripten 4.0.11.
+- `tools/engine/forward_port_probe.sh` performs the source merge and emits a conflict inventory.
+- `tools/engine/prepare_port_candidate.sh` reconstructs the pinned merged tree and applies narrow Starjunk compatibility shims.
+- `tools/engine/apply_starjunk_port_patches.py` fails closed if an expected patch anchor drifts.
+- `WebGPU 4.7.2 Candidate Build` compiles a web template against the pinned Emscripten version.
 
-## Phase 0 — validation harness
+## Phases
 
-Keep upstream Godot 4.7.2 smoke tests green and make the renderer torture scene the acceptance workload.
-
-## Phase 1 — buildable driver/backend
-
-First make the cleanly merged 4.7.2 candidate compile as a WebGPU web template. Fix build/interface problems as narrow engine patches and document each one.
-
-## Phase 2 — shader translation
-
-Validate the secondary branch's translation path, then compare against the Walter/Tint implementation for browser-focused correctness and coverage. Preserve small shader fixtures for each issue.
-
-## Phase 3 — RenderingDevice compatibility
-
-Resolve runtime/API differences deliberately. Do not patch gameplay code around engine failures.
-
-## Phase 4 — Forward Mobile correctness
-
-Validate sky, canvas, shadows, materials, skeletons, GPU particles, particle trails and the permanent renderer torture workload.
-
-## Phase 5 — browser integration
-
-Validate device bootstrap, async GPU readback semantics, feature detection and graceful WebGPU-unavailable behavior.
-
-## Phase 6 — performance optimizations
-
-Only after correctness, import measured optimizations from the Walter implementation in isolated groups and benchmark each group.
+1. **Buildable driver/backend:** make the 4.7.2 candidate compile; patch one concrete incompatibility group at a time.
+2. **Shader translation:** validate the bridge translation path, then compare against the Walter/Tint implementation and preserve minimal fixtures.
+3. **RenderingDevice compatibility:** resolve runtime/API differences in the engine layer, never gameplay.
+4. **Forward Mobile correctness:** validate sky, canvas, shadows, materials, skeletons, GPU particles and particle trails.
+5. **Browser integration:** validate device bootstrap, async GPU readback, feature detection and failure behavior.
+6. **Performance:** only after correctness, import measured optimizations in isolated groups and benchmark each against the permanent torture workload.
 
 ## Exit criteria
 
-The WebGPU build renders the torture workload correctly in supported desktop browsers, produces machine-readable benchmark results, and does not require game-domain code to know it is running on a fork.
+The WebGPU build renders the torture workload correctly in supported desktop browsers, produces machine-readable benchmark results, and game-domain code does not know it is running on an engine fork.

@@ -41,4 +41,6 @@ if git -C "$WORK_DIR" diff --name-only --diff-filter=U | grep -q .; then
   exit 3
 fi
 
+python3 "$ROOT/tools/engine/apply_starjunk_port_patches.py" "$WORK_DIR"
+
 printf '%s\n' "$WORK_DIR"

@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
-      EM_VERSION: "4.0.11"
+      EM_VERSION: "6.0.9"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
