@@ -4,41 +4,100 @@
   "title": "Starjunk Racer 95 track package",
   "type": "object",
   "additionalProperties": false,
-  "required": ["format", "name", "environment", "collision", "checkpoints", "spawn_points"],
+  "required": [
+    "format",
+    "name",
+    "environment",
+    "collision",
+    "checkpoints",
+    "spawn_points"
+  ],
   "properties": {
-    "format": {"const": "starjunk95/track/1"},
-    "name": {"type": "string", "minLength": 1, "maxLength": 128},
-    "author": {"type": "string", "maxLength": 128},
-    "environment": {"type": "string", "pattern": "^[^/].*\\.glb$"},
-    "collision": {"type": "string", "pattern": "^[^/].*\\.glb$"},
-    "preview": {"type": "string"},
-    "song_cue_set": {"type": "string"},
+    "format": {
+      "const": "starjunk95/track/1"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "author": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "environment": {
+      "type": "string",
+      "pattern": "^[^/].*\\.glb$"
+    },
+    "collision": {
+      "type": "string",
+      "pattern": "^[^/].*\\.glb$"
+    },
+    "preview": {
+      "type": "string"
+    },
+    "song_cue_set": {
+      "type": "string"
+    },
     "checkpoints": {
       "type": "array",
       "minItems": 2,
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "position", "size"],
+        "required": [
+          "id",
+          "position",
+          "size"
+        ],
         "properties": {
-          "id": {"type": "string"},
-          "position": {"$ref": "#/$defs/vec3"},
-          "size": {"$ref": "#/$defs/vec3"}
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 96
+          },
+          "position": {
+            "$ref": "#/$defs/vec3"
+          },
+          "size": {
+            "$ref": "#/$defs/positive_vec3"
+          }
         }
-      }
+      },
+      "maxItems": 256
     },
     "spawn_points": {
       "type": "array",
       "minItems": 1,
-      "items": {"$ref": "#/$defs/transform"}
+      "items": {
+        "$ref": "#/$defs/transform"
+      },
+      "maxItems": 32
     },
     "renderer": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "particle_trails": {"enum": ["optional", "required", "disabled"]},
-        "compute_effects": {"enum": ["optional", "required", "disabled"]},
-        "forward_plus_extras": {"enum": ["optional", "disabled"]}
+        "particle_trails": {
+          "enum": [
+            "optional",
+            "required",
+            "disabled"
+          ]
+        },
+        "compute_effects": {
+          "enum": [
+            "optional",
+            "required",
+            "disabled"
+          ]
+        },
+        "forward_plus_extras": {
+          "enum": [
+            "optional",
+            "disabled"
+          ]
+        }
       }
     }
   },
@@ -47,15 +106,34 @@
       "type": "array",
       "minItems": 3,
       "maxItems": 3,
-      "items": {"type": "number"}
+      "items": {
+        "type": "number"
+      }
     },
     "transform": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["position", "rotation_degrees"],
+      "required": [
+        "position",
+        "rotation_degrees"
+      ],
       "properties": {
-        "position": {"$ref": "#/$defs/vec3"},
-        "rotation_degrees": {"$ref": "#/$defs/vec3"}
+        "position": {
+          "$ref": "#/$defs/vec3"
+        },
+        "rotation_degrees": {
+          "$ref": "#/$defs/vec3"
+        }
+      }
+    },
+    "positive_vec3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 1000
       }
     }
   }

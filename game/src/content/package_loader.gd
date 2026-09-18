@@ -80,8 +80,26 @@ func _validate_track(manifest: Dictionary) -> Dictionary:
 
 	if not manifest["checkpoints"] is Array or manifest["checkpoints"].size() < 2:
 		return _error("Track requires at least two checkpoints")
+	if manifest["checkpoints"].size() > 256:
+		return _error("Track has too many checkpoints")
+	var checkpoint_ids := {}
+	for checkpoint in manifest["checkpoints"]:
+		var checkpoint_error := _validate_checkpoint(checkpoint)
+		if not checkpoint_error.is_empty():
+			return _error(checkpoint_error)
+		var checkpoint_id := str(checkpoint["id"])
+		if checkpoint_ids.has(checkpoint_id):
+			return _error("Track checkpoint ids must be unique")
+		checkpoint_ids[checkpoint_id] = true
+
 	if not manifest["spawn_points"] is Array or manifest["spawn_points"].is_empty():
 		return _error("Track requires at least one spawn point")
+	if manifest["spawn_points"].size() > 32:
+		return _error("Track has too many spawn points")
+	for spawn_point in manifest["spawn_points"]:
+		var spawn_error := _validate_spawn_point(spawn_point)
+		if not spawn_error.is_empty():
+			return _error(spawn_error)
 
 	return {"ok": true, "kind": "track", "manifest": manifest.duplicate(true)}
 
@@ -112,6 +130,46 @@ func _validate_relative_asset_path(label: String, value: Variant) -> String:
 		if component == "." or component == ".." or component.is_empty():
 			return "%s contains an unsafe path component" % label
 	return ""
+
+func _validate_checkpoint(value: Variant) -> String:
+	if not value is Dictionary:
+		return "Track checkpoint must be an object"
+	for key in ["id", "position", "size"]:
+		if not value.has(key):
+			return "Track checkpoint missing %s" % key
+	var checkpoint_id := str(value["id"])
+	if checkpoint_id.is_empty() or checkpoint_id.length() > 96:
+		return "Track checkpoint id has invalid length"
+	if not _finite_vec3(value["position"]):
+		return "Track checkpoint position must contain three finite numbers"
+	if not _finite_vec3(value["size"]):
+		return "Track checkpoint size must contain three finite numbers"
+	for component in value["size"]:
+		if float(component) <= 0.0 or float(component) > 1000.0:
+			return "Track checkpoint size components must be within 0..1000"
+	return ""
+
+func _validate_spawn_point(value: Variant) -> String:
+	if not value is Dictionary:
+		return "Track spawn point must be an object"
+	for key in ["position", "rotation_degrees"]:
+		if not value.has(key):
+			return "Track spawn point missing %s" % key
+	if not _finite_vec3(value["position"]):
+		return "Track spawn position must contain three finite numbers"
+	if not _finite_vec3(value["rotation_degrees"]):
+		return "Track spawn rotation must contain three finite numbers"
+	return ""
+
+func _finite_vec3(value: Variant) -> bool:
+	if not value is Array or value.size() != 3:
+		return false
+	for component in value:
+		if component is int:
+			continue
+		if not component is float or not is_finite(component):
+			return false
+	return true
 
 func _error(message: String) -> Dictionary:
 	return {"ok": false, "error": message}

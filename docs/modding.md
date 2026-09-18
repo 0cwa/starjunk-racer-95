@@ -34,6 +34,17 @@ After Godot generates the scene, the importer removes scripts, animation players
 
 This is deliberately asymmetric: custom geometry is open; competitive collision and physics are not supplied by the package.
 
+## Runtime track import
+
+`CommunityTrackImporter` keeps presentation and race collision separate.
+
+- The environment GLB is embedded-only, size/node/light capped, and sanitized to visual `Node3D` content. Cameras, collision nodes, audio nodes, casts, scripts and non-3D helper nodes are removed.
+- The collision GLB is never instantiated as an authored scene. Meshes are read from the generated GLB tree and converted into game-owned `StaticBody3D` + `CollisionShape3D` nodes.
+- Collision mesh count and total triangle count are capped to prevent a community track from turning physics into an accidental denial-of-service workload.
+- Checkpoints and spawn transforms come from the declarative manifest and are validated for finite coordinates, positive checkpoint extents, uniqueness and bounded counts.
+
+This means track authors control road shape and race layout without supplying engine scripts or arbitrary physics objects.
+
 ## Future programmable mods
 
 If programmable mods are introduced, they must run in a sandbox with explicit capabilities, such as reading beat timing or spawning cosmetic particles. They must not receive ambient filesystem/network authority or permission to alter authoritative race results.
