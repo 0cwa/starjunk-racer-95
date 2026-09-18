@@ -4,6 +4,7 @@
 - `development.md` — contributor/agent workflow.
 - `performance.md` — benchmark and regression policy.
 - `handling.md` — vehicle profile and realism-slider architecture.
+- `balance.md` — deterministic vehicle characterization and future balance gates.
 - `modding.md` — community content model.
 - `networking.md` — Spritely integration direction.
 - `webgpu-forward-port.md` — phased engine-port plan.
