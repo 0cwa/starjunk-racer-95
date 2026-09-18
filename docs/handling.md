@@ -61,3 +61,17 @@ Suspension parameters are trusted performance-profile values and do **not** chan
 The force is clamped at zero so the suspension never pulls the chassis toward the road, and at a profile maximum so extreme contact events cannot create unbounded impulses.
 
 The future raycast wheel adapter should retain previous compression per wheel, call this model each physics tick, and feed its normal load into `TireForceModel`.
+
+## First raycast vehicle integration
+
+`RaycastVehicleController` and `RaycastWheel3D` are intentionally thin adapters over the pure handling modules:
+
+1. a wheel ray gathers contact point/normal/distance;
+2. `SuspensionModel` produces normal load;
+3. rigid-body point velocity becomes wheel-frame slip through `WheelSlipKinematics`;
+4. `TireForceModel` produces lateral force and clamps it together with requested drive/brake force;
+5. Godot receives the resulting positioned force.
+
+The prototype currently uses rear-wheel drive, front-wheel steering, direct requested longitudinal force, and does not yet simulate wheel rotational inertia or apply the arcade assist terms. Those are explicit next steps, not hidden approximations.
+
+The integration test builds a flat road and four-wheel car entirely in code, lets it settle on its suspension, then applies throttle and requires forward motion without non-finite state. CI uses `--fixed-fps 60` so the physics frames execute deterministically without real-time waiting.
