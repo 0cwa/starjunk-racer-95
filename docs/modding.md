@@ -22,7 +22,9 @@ Asset references must stay within the package root. The runtime rejects absolute
 
 A car's `performance_profile` must exist in `PerformanceProfileRegistry`. Community content may select a trusted profile ID but cannot define or replace the resource behind that ID.
 
-Archive extraction, when added, must independently enforce the same no-traversal rule before writing files.
+Downloaded ZIP packages pass through `CommunityPackageArchive` before any manifest or GLB is trusted. The archive's central directory is preflighted before decompression: encrypted/ZIP64 entries are rejected, names are restricted to unambiguous safe ASCII package-relative paths, duplicate/case-colliding paths are rejected, Unix symlinks are rejected, and hard archive/entry/expanded-size/compression-ratio limits are enforced. Only then are files copied into a fresh `user://` staging directory.
+
+The extractor writes every ZIP entry itself rather than restoring archive permissions, so an archive cannot create filesystem symlinks or executable permission state. A root `manifest.json` is required and is validated before the staging result is accepted.
 
 ## Runtime car visual import
 
