@@ -41,6 +41,8 @@ jobs:
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/suspension_model_test.tscn'
       - name: Run raycast vehicle integration test
         run: '"$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/raycast_vehicle_test.tscn'
+      - name: Run playable prototype race integration test
+        run: 'timeout 45s "$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/prototype_race_test.tscn'
       - name: Run vehicle telemetry accumulator tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/vehicle_telemetry_accumulator_test.tscn'
       - name: Characterize prototype vehicle
