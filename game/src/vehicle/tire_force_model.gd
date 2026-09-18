@@ -51,6 +51,45 @@ static func lateral_force_n(
 	var opposing_sign := -1.0 if slip_angle_rad > 0.0 else 1.0
 	return opposing_sign * peak_force_n * magnitude_shape
 
+
+static func longitudinal_force_n(
+		slip_ratio: float,
+		normal_load_n: float,
+		grip_coefficient: float,
+		longitudinal_stiffness_n_per_slip: float,
+		peak_slip_ratio: float,
+		slide_grip_ratio: float = DEFAULT_SLIDE_GRIP_RATIO
+) -> float:
+	if is_zero_approx(slip_ratio):
+		return 0.0
+	if normal_load_n <= 0.0 or grip_coefficient <= 0.0 or longitudinal_stiffness_n_per_slip <= 0.0:
+		return 0.0
+
+	var peak_force_n := normal_load_n * grip_coefficient
+	var peak_ratio := maxf(peak_slip_ratio, 0.001)
+	var normalized_slip := absf(slip_ratio) / peak_ratio
+	var magnitude_shape: float
+
+	if normalized_slip <= 1.0:
+		var slope := clampf(
+			longitudinal_stiffness_n_per_slip * peak_ratio / peak_force_n,
+			0.0,
+			3.0
+		)
+		var x := normalized_slip
+		magnitude_shape = (
+			(slope - 2.0) * x * x * x
+			+ (3.0 - 2.0 * slope) * x * x
+			+ slope * x
+		)
+		magnitude_shape = clampf(magnitude_shape, 0.0, 1.0)
+	else:
+		var slide_ratio := clampf(slide_grip_ratio, 0.0, 1.0)
+		var excess := normalized_slip - 1.0
+		magnitude_shape = slide_ratio + (1.0 - slide_ratio) * exp(-POST_PEAK_FALLOFF * excess)
+
+	return signf(slip_ratio) * peak_force_n * magnitude_shape
+
 # Applies a normalized friction ellipse. The x component is longitudinal force
 # and y is lateral force. longitudinal_grip_bias allows a trusted profile to
 # express braking/drive-vs-cornering character without exceeding the combined

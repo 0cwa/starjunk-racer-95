@@ -4,13 +4,22 @@ extends RayCast3D
 @export var steerable: bool = false
 @export var driven: bool = false
 
+var wheel_angular_speed_rad_s: float = 0.0
 var _previous_compression_m: float = 0.0
+var _wheel_radius_m: float = 0.31
 var last_sample: Dictionary = {}
 
 func configure(profile: VehiclePerformanceProfile) -> void:
+	_wheel_radius_m = profile.wheel_radius_m
 	target_position = Vector3.DOWN * (profile.suspension_rest_length_m + profile.wheel_radius_m)
 	enabled = true
 	exclude_parent = true
+
+func reset_rotation_state(longitudinal_speed_mps: float = 0.0) -> void:
+	wheel_angular_speed_rad_s = WheelSlipKinematics.wheel_angular_speed_for_rolling(
+		longitudinal_speed_mps,
+		_wheel_radius_m
+	)
 
 func sample_and_apply(
 		body: RigidBody3D,
@@ -20,15 +29,33 @@ func sample_and_apply(
 		drive_force_request_n: float,
 		brake_force_request_n: float
 ) -> Dictionary:
+	var wheel_radius := float(handling["wheel_radius_m"])
+	var drive_torque_nm := drive_force_request_n * wheel_radius
+	var brake_torque_nm := brake_force_request_n * wheel_radius
+
 	force_raycast_update()
 	if not is_colliding():
 		_previous_compression_m = 0.0
-		last_sample = {"grounded": false}
+		wheel_angular_speed_rad_s = WheelRotationModel.integrate_angular_speed(
+			wheel_angular_speed_rad_s,
+			wheel_angular_speed_rad_s,
+			drive_torque_nm,
+			brake_torque_nm,
+			0.0,
+			float(handling["wheel_angular_damping_n_m_s"]),
+			float(handling["wheel_inertia_kg_m2"]),
+			delta_seconds,
+			float(handling["max_wheel_angular_speed_rad_s"])
+		)
+		last_sample = {
+			"grounded": false,
+			"wheel_angular_speed_rad_s": wheel_angular_speed_rad_s,
+			"longitudinal_slip_ratio": 0.0,
+		}
 		return last_sample
 
 	var contact_point := get_collision_point()
 	var surface_normal := get_collision_normal().normalized()
-	var wheel_radius := float(handling["wheel_radius_m"])
 	var contact_distance := maxf(global_position.distance_to(contact_point) - wheel_radius, 0.0)
 	var compression := SuspensionModel.compression_m(
 		float(handling["suspension_rest_length_m"]),
@@ -57,11 +84,27 @@ func sample_and_apply(
 	if steerable:
 		wheel_forward = Basis(body_up, steer_angle_rad) * wheel_forward
 
-	# Tyre forces belong in the road tangent plane even when the track is banked.
 	wheel_forward = wheel_forward.slide(surface_normal).normalized()
 	if wheel_forward.length_squared() < 0.000001:
-		last_sample = {"grounded": true, "normal_force_n": normal_force}
-		body.apply_force(body_up * normal_force, contact_point - body.global_position)
+		var force_offset_fallback := contact_point - body.global_position
+		body.apply_force(body_up * normal_force, force_offset_fallback)
+		wheel_angular_speed_rad_s = WheelRotationModel.integrate_angular_speed(
+			wheel_angular_speed_rad_s,
+			wheel_angular_speed_rad_s,
+			drive_torque_nm,
+			brake_torque_nm,
+			0.0,
+			float(handling["wheel_angular_damping_n_m_s"]),
+			float(handling["wheel_inertia_kg_m2"]),
+			delta_seconds,
+			float(handling["max_wheel_angular_speed_rad_s"])
+		)
+		last_sample = {
+			"grounded": true,
+			"normal_force_n": normal_force,
+			"wheel_angular_speed_rad_s": wheel_angular_speed_rad_s,
+			"longitudinal_slip_ratio": 0.0,
+		}
 		return last_sample
 	var wheel_right := wheel_forward.cross(surface_normal).normalized()
 
@@ -70,6 +113,11 @@ func sample_and_apply(
 	var longitudinal_speed := point_velocity.dot(wheel_forward)
 	var lateral_speed := point_velocity.dot(wheel_right)
 	var slip_angle := WheelSlipKinematics.slip_angle_rad(longitudinal_speed, lateral_speed)
+	var longitudinal_slip_ratio := WheelSlipKinematics.longitudinal_slip_ratio(
+		longitudinal_speed,
+		wheel_angular_speed_rad_s,
+		wheel_radius
+	)
 
 	var slide_grip_ratio := HandlingAssistModel.slide_grip_ratio(
 		TireForceModel.DEFAULT_SLIDE_GRIP_RATIO,
@@ -83,10 +131,14 @@ func sample_and_apply(
 		float(handling["peak_slip_angle_deg"]),
 		slide_grip_ratio
 	)
-
-	var longitudinal_force := drive_force_request_n
-	if brake_force_request_n > 0.0 and absf(longitudinal_speed) > 0.05:
-		longitudinal_force -= signf(longitudinal_speed) * brake_force_request_n
+	var longitudinal_force := TireForceModel.longitudinal_force_n(
+		longitudinal_slip_ratio,
+		normal_force,
+		float(handling["base_grip_coefficient"]) * float(handling["longitudinal_grip_bias"]),
+		float(handling["base_longitudinal_stiffness_n_per_slip"]),
+		float(handling["base_peak_longitudinal_slip_ratio"]),
+		slide_grip_ratio
+	)
 
 	var combined := TireForceModel.clamp_combined_forces(
 		longitudinal_force,
@@ -100,14 +152,30 @@ func sample_and_apply(
 	var tyre_force := wheel_forward * combined.x + wheel_right * combined.y
 	body.apply_force(suspension_force + tyre_force, force_offset)
 
+	var tyre_reaction_torque_nm := -combined.x * wheel_radius
+	wheel_angular_speed_rad_s = WheelRotationModel.integrate_angular_speed(
+		wheel_angular_speed_rad_s,
+		WheelSlipKinematics.wheel_angular_speed_for_rolling(longitudinal_speed, wheel_radius),
+		drive_torque_nm,
+		brake_torque_nm,
+		tyre_reaction_torque_nm,
+		float(handling["wheel_angular_damping_n_m_s"]),
+		float(handling["wheel_inertia_kg_m2"]),
+		delta_seconds,
+		float(handling["max_wheel_angular_speed_rad_s"])
+	)
+
 	last_sample = {
 		"grounded": true,
+		"driven": driven,
 		"contact_point": contact_point,
 		"compression_m": compression,
 		"normal_force_n": normal_force,
 		"longitudinal_speed_mps": longitudinal_speed,
 		"lateral_speed_mps": lateral_speed,
 		"slip_angle_rad": slip_angle,
+		"longitudinal_slip_ratio": longitudinal_slip_ratio,
+		"wheel_angular_speed_rad_s": wheel_angular_speed_rad_s,
 		"slide_grip_ratio": slide_grip_ratio,
 		"longitudinal_force_n": combined.x,
 		"lateral_force_n": combined.y,
