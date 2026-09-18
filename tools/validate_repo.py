@@ -14,6 +14,7 @@ REQUIRED = [
     "game/tests/perf/renderer_torture/renderer_torture.gd",
     "packages/schemas/car.schema.json",
     "packages/schemas/track.schema.json",
+    "packages/schemas/cue-set.schema.json",
     "perf/budgets.json",
     ".github/workflows/ci.yml",
     ".github/workflows/nightly-performance.yml",
@@ -28,6 +29,7 @@ def main() -> None:
         "engine/source-lock.json",
         "packages/schemas/car.schema.json",
         "packages/schemas/track.schema.json",
+        "packages/schemas/cue-set.schema.json",
         "perf/budgets.json",
     ]:
         with (ROOT / path).open("r", encoding="utf-8") as handle:

@@ -78,6 +78,11 @@ func _validate_track(manifest: Dictionary) -> Dictionary:
 		if not preview_error.is_empty():
 			return _error(preview_error)
 
+	if manifest.has("song_cue_set"):
+		var cue_error := _validate_package_asset_path("song_cue_set", manifest["song_cue_set"], [".json"])
+		if not cue_error.is_empty():
+			return _error(cue_error)
+
 	if not manifest["checkpoints"] is Array or manifest["checkpoints"].size() < 2:
 		return _error("Track requires at least two checkpoints")
 	if manifest["checkpoints"].size() > 256:

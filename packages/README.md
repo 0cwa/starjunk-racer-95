@@ -15,3 +15,9 @@ The `starjunk95/*/1` formats are deliberately engine-independent public contract
 - Imported packages should be treated as untrusted input before any files are opened or instantiated.
 
 The JSON schemas define portable structure. The Godot-side loader adds runtime policy checks that schemas alone cannot express, such as whether a requested performance profile is trusted by this game version.
+
+## Song-reactive cue sets
+
+A track may point at a package-relative `.json` cue set using `song_cue_set`. Cue sets use `starjunk95/cue-set/1` and contain timed, declarative presentation events only. They cannot alter race physics, checkpoints, lap state, vehicle forces, filesystem state or network authority.
+
+Supported generation-1 cue kinds are `palette`, `lighting`, `particles`, `scenery`, `post_process`, and `beat`. The runtime validates and sorts cues deterministically before playback.

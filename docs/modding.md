@@ -62,6 +62,14 @@ This is deliberately asymmetric: custom geometry is open; competitive collision 
 
 This means track authors control road shape and race layout without supplying engine scripts or arbitrary physics objects.
 
+## Song-reactive presentation
+
+Tracks can optionally reference a declarative `starjunk95/cue-set/1` JSON file. `SongCueTimeline` validates the cue set, sorts equal-time cues deterministically by ID, and advances presentation events from song time.
+
+Cue events are deliberately presentation-only: palette, lighting, particles, scenery phase changes, post-processing and beat markers. They do not alter vehicle physics, collision, checkpoints, lap state or capability authority. Seeking the music resets timeline position without replaying every earlier cue; callers decide whether to reconstruct presentation state from persistent theme data.
+
+This lets official Starjunk 95 courses and community tracks share one song-reactive mechanism without loading arbitrary scripts.
+
 ## Future programmable mods
 
 If programmable mods are introduced, they must run in a sandbox with explicit capabilities, such as reading beat timing or spawning cosmetic particles. They must not receive ambient filesystem/network authority or permission to alter authoritative race results.

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starjunk95.invalid/schemas/cue-set.schema.json",
+  "title": "Starjunk Racer 95 song-reactive cue set",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "duration_ms", "cues"],
+  "properties": {
+    "format": {"const": "starjunk95/cue-set/1"},
+    "duration_ms": {"type": "integer", "minimum": 1, "maximum": 21600000},
+    "bpm": {"type": "number", "exclusiveMinimum": 0, "maximum": 1000},
+    "cues": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "time_ms", "kind"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1, "maxLength": 96},
+          "time_ms": {"type": "integer", "minimum": 0},
+          "kind": {
+            "enum": ["palette", "lighting", "particles", "scenery", "post_process", "beat"]
+          },
+          "payload": {
+            "type": "object",
+            "maxProperties": 32
+          }
+        }
+      }
+    }
+  }
+}
