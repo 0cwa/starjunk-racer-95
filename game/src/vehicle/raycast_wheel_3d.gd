@@ -20,6 +20,8 @@ func reset_rotation_state(longitudinal_speed_mps: float = 0.0) -> void:
 		longitudinal_speed_mps,
 		_wheel_radius_m
 	)
+	_previous_compression_m = 0.0
+	last_sample = {}
 
 func sample_and_apply(
 		body: RigidBody3D,
@@ -49,6 +51,7 @@ func sample_and_apply(
 		)
 		last_sample = {
 			"grounded": false,
+			"driven": driven,
 			"wheel_angular_speed_rad_s": wheel_angular_speed_rad_s,
 			"longitudinal_slip_ratio": 0.0,
 		}
@@ -101,6 +104,7 @@ func sample_and_apply(
 		)
 		last_sample = {
 			"grounded": true,
+			"driven": driven,
 			"normal_force_n": normal_force,
 			"wheel_angular_speed_rad_s": wheel_angular_speed_rad_s,
 			"longitudinal_slip_ratio": 0.0,

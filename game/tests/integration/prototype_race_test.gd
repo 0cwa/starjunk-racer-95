@@ -28,6 +28,7 @@ func _ready() -> void:
 	await _physics_frames(90)
 	_race.vehicle.set_controls(0.0, 0.0, 0.0)
 	_check(_race.vehicle.global_position.distance_to(start) > 0.25, "prototype car should respond to throttle")
+	_check(_max_abs_wheel_speed() > 0.1, "driving should create wheel angular speed")
 
 	_race.set_realism(1.0)
 	_check(is_equal_approx(_race.vehicle.realism, 1.0), "realism slider path should update vehicle handling")
@@ -36,6 +37,7 @@ func _ready() -> void:
 	_race.reset_vehicle()
 	_check(_race.vehicle.linear_velocity.length() < 0.0001, "reset should clear linear velocity immediately")
 	_check(_race.vehicle.angular_velocity.length() < 0.0001, "reset should clear angular velocity immediately")
+	_check(_max_abs_wheel_speed() < 0.0001, "reset should clear wheel angular speed immediately")
 	var reset_position := _race.vehicle.global_position
 	await get_tree().physics_frame
 	_check(_finite_vec3(_race.vehicle.global_position), "vehicle position must remain finite after reset")
@@ -45,6 +47,13 @@ func _ready() -> void:
 func _physics_frames(count: int) -> void:
 	for _index in range(count):
 		await get_tree().physics_frame
+
+func _max_abs_wheel_speed() -> float:
+	var maximum := 0.0
+	for child in _race.vehicle.get_children():
+		if child is RaycastWheel3D:
+			maximum = maxf(maximum, absf(child.wheel_angular_speed_rad_s))
+	return maximum
 
 func _finite_vec3(value: Vector3) -> bool:
 	return is_finite(value.x) and is_finite(value.y) and is_finite(value.z)
