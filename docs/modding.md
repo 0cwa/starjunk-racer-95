@@ -62,6 +62,20 @@ This is deliberately asymmetric: custom geometry is open; competitive collision 
 
 This means track authors control road shape and race layout without supplying engine scripts or arbitrary physics objects.
 
+## Race-ready community bundles
+
+`CommunityRaceBundle` is the assembly boundary between staged community packages and race code. It computes canonical content descriptors for a car and track, verifies the expected package kinds, imports both through the existing sanitizers, and returns one race-ready dictionary containing:
+
+- exact car and track content IDs;
+- sanitized car visual plus its trusted game-owned performance profile;
+- sanitized track visual plus game-owned collision nodes;
+- validated checkpoints and spawn transforms;
+- immutable copies of both manifests.
+
+Bundle construction is atomic: if the second import fails, nodes created by the first import are freed. `release()` frees a successful bundle's runtime nodes. This keeps the playable race from needing to know archive, hashing, GLB, or trust-boundary details.
+
+A future multiplayer room can therefore bind a capability reference to a specific `content_id` before asking the race runtime to mount the bundle.
+
 ## Song-reactive presentation
 
 Tracks can optionally reference a declarative `starjunk95/cue-set/1` JSON file. `SongCueTimeline` validates the cue set, sorts equal-time cues deterministically by ID, and advances presentation events from song time.
