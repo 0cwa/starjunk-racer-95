@@ -23,9 +23,6 @@ jobs:
               apt-get update
               apt-get install -y --no-install-recommends                 ca-certificates                 guile-3.0                 guile-goblins                 guile-hoot                 guile-websocket                 nodejs
 
-              guile -c "(use-modules (goblins)) (display "Goblins load OK\n")"
-              guile -c "(use-modules (hoot compile)) (display "Hoot load OK\n")"
-
               timeout 60s guile networking/spritely/captp_room_smoke.scm
 
               mkdir -p build/spritely
