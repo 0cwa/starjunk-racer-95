@@ -54,6 +54,8 @@ jobs:
           name: vehicle-characterization
           path: vehicle-characterization.json
           if-no-files-found: error
+      - name: Run song cue timeline tests
+        run: '"$GODOT_BIN" --headless --path game res://tests/unit/song_cue_timeline_test.tscn'
       - name: Run race protocol tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/race_protocol_test.tscn'
       - name: Run community package safety tests
