@@ -52,6 +52,17 @@ clone_at "$SPIRV_REPO" "$SPIRV_SHA" "$WORK_ROOT/spirv-webgpu-transform"
 
 rustup target add wasm32-unknown-emscripten
 
+# naga-native generates Rust FFI bindings from its C header during the build.
+# Bindgen otherwise discovers the host's /usr/include even though rustc targets
+# Emscripten. Force Clang to use the same target/sysroot as emcc.
+EMSCRIPTEN_SYSROOT="${EMSDK:?EMSDK must be set by the Emscripten environment}/upstream/emscripten/cache/sysroot"
+test -d "$EMSCRIPTEN_SYSROOT"
+export BINDGEN_EXTRA_CLANG_ARGS_wasm32_unknown_emscripten="--target=wasm32-unknown-emscripten --sysroot=$EMSCRIPTEN_SYSROOT"
+export BINDGEN_EXTRA_CLANG_ARGS_wasm32_unknown_emscripten_unknown="${BINDGEN_EXTRA_CLANG_ARGS_wasm32_unknown_emscripten}"
+export CC_wasm32_unknown_emscripten=emcc
+export CXX_wasm32_unknown_emscripten=em++
+export AR_wasm32_unknown_emscripten=emar
+
 # Keep the translator minimal: Godot only needs SPIR-V input, validation and
 # WGSL output from this C FFI library.
 cargo build   --manifest-path "$WORK_ROOT/naga-native/Cargo.toml"   --release   --locked   --target wasm32-unknown-emscripten   --no-default-features   --features spv-in,wgsl-out
