@@ -67,5 +67,5 @@ static func slide_grip_ratio(base_slide_grip_ratio: float, grip_recovery_assist:
 	return lerpf(base_ratio, maxf(base_ratio, MAX_RECOVERY_SLIDE_GRIP_RATIO), assist)
 
 static func _chassis_slip_angle_rad(forward_speed_mps: float, lateral_speed_mps: float) -> float:
-	var reference_forward := maxf(absf(forward_speed_mps), WheelSlipKinematics.MIN_REFERENCE_SPEED_MPS)
+	var reference_forward := maxf(absf(forward_speed_mps), WheelSlipKinematics.DEFAULT_LOW_SPEED_REFERENCE_MPS)
 	return atan2(lateral_speed_mps, reference_forward)
