@@ -7,6 +7,9 @@ on:
     paths:
       - "engine/**"
       - "tools/engine/**"
+      - "tools/perf/webgpu_browser_smoke.py"
+      - "game/export_presets.cfg"
+      - "game/tests/perf/renderer_torture/**"
       - ".github/workflows/webgpu-candidate-build.yml"
   workflow_dispatch:
 
@@ -48,9 +51,32 @@ jobs:
       - name: List build outputs
         if: always()
         run: find build/webgpu-port-candidate/godot/bin -maxdepth 1 -type f -printf '%f %s bytes\n' 2>/dev/null | sort || true
+      - name: Download upstream Godot editor for export
+        env:
+          GODOT_VERSION: "4.7.2"
+        run: |
+          curl -fL --retry 3 -o /tmp/godot.zip             "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /tmp/godot-editor
+          chmod +x /tmp/godot-editor/Godot_v${GODOT_VERSION}-stable_linux.x86_64
+          echo "GODOT_BIN=/tmp/godot-editor/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Install browser smoke dependency
+        run: python3 -m pip install websocket-client
+      - name: Export Starjunk WebGPU renderer torture scene
+        run: |
+          tools/engine/export_webgpu_benchmark.sh             "$GODOT_BIN"             "$GITHUB_WORKSPACE/build/webgpu-port-candidate/godot/bin/godot.web.template_release.wasm32.nothreads.zip"             "$GITHUB_WORKSPACE/build/web-benchmark"
+      - name: Run Chromium WebGPU smoke
+        run: |
+          python3 tools/perf/webgpu_browser_smoke.py             --root build/web-benchmark             --output build/webgpu-browser-smoke.json             --timeout 90
+          cat build/webgpu-browser-smoke.json
       - uses: actions/upload-artifact@v4
         if: success()
         with:
           name: godot-4.7.2-webgpu-template
-          path: build/webgpu-port-candidate/godot/bin/*
+          path: build/webgpu-port-candidate/godot/bin/godot.web.template_release.wasm32.nothreads.zip
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: webgpu-browser-smoke
+          path: build/webgpu-browser-smoke.json
+          if-no-files-found: warn
