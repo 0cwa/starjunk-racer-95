@@ -59,6 +59,6 @@ jobs:
       - name: Run community car runtime importer tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/community_car_importer_test.tscn'
       - name: Run community track runtime importer tests
-        run: '"$GODOT_BIN" --headless --path game res://tests/unit/community_track_importer_test.tscn'
+        run: 'timeout 90s "$GODOT_BIN" --headless --path game res://tests/unit/community_track_importer_test.tscn'
       - name: Load renderer torture scene
         run: '"$GODOT_BIN" --headless --path game res://tests/perf/renderer_torture/renderer_torture.tscn --quit-after 20'

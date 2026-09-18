@@ -7,9 +7,12 @@ const COLLISION_PATH := TEMP_ROOT + "/collision.glb"
 var _failures := PackedStringArray()
 
 func _ready() -> void:
+	print("TRACK_IMPORT_TEST_STAGE setup")
 	var make_dir_error := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(TEMP_ROOT))
 	_check(make_dir_error == OK or make_dir_error == ERR_ALREADY_EXISTS, "test track package directory should exist")
+	print("TRACK_IMPORT_TEST_STAGE write_environment")
 	_check(_write_environment_glb(), "test environment GLB should export")
+	print("TRACK_IMPORT_TEST_STAGE write_collision")
 	_check(_write_collision_glb(), "test collision GLB should export")
 
 	var manifest := {
@@ -38,8 +41,10 @@ func _ready() -> void:
 		],
 	}
 
+	print("TRACK_IMPORT_TEST_STAGE import_track")
 	var importer := CommunityTrackImporter.new()
 	var result := importer.import_track(TEMP_ROOT, manifest)
+	print("TRACK_IMPORT_TEST_STAGE imported")
 	_check(bool(result.get("ok", false)), "community track should import: %s" % str(result.get("error", "")))
 	if bool(result.get("ok", false)):
 		var root: Node3D = result["node"]
@@ -62,7 +67,9 @@ func _ready() -> void:
 			_check(spawns[0].position.is_equal_approx(Vector3(1.0, 0.6, 2.0)), "spawn position should be preserved")
 		root.free()
 
+	print("TRACK_IMPORT_TEST_STAGE cleanup")
 	_cleanup()
+	print("TRACK_IMPORT_TEST_STAGE finish")
 	_finish()
 
 func _write_environment_glb() -> bool:
