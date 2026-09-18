@@ -121,12 +121,27 @@ func mount_community_bundle(bundle: Dictionary) -> String:
 		return "community bundle runtime nodes are already mounted"
 	if not profile is VehiclePerformanceProfile:
 		return "community bundle has invalid performance profile"
+	var car_content_id := str(bundle["car_content_id"])
+	var track_content_id := str(bundle["track_content_id"])
+	if not car_content_id.begins_with("sha256:") or not track_content_id.begins_with("sha256:"):
+		return "community bundle content ids must be SHA-256 identifiers"
+
 	var checkpoints = bundle["checkpoints"]
 	var spawn_points = bundle["spawn_points"]
 	if not checkpoints is Array or checkpoints.size() < 2:
 		return "community bundle requires at least two checkpoints"
-	if not spawn_points is Array or spawn_points.is_empty() or not spawn_points[0] is Transform3D:
+	for checkpoint in checkpoints:
+		if not _checkpoint_definition_valid(checkpoint):
+			return "community checkpoint is malformed"
+	if not spawn_points is Array or spawn_points.is_empty():
 		return "community bundle requires a spawn transform"
+	for spawn in spawn_points:
+		if not spawn is Transform3D:
+			return "community spawn entry must be a Transform3D"
+
+	var profile_problems: PackedStringArray = profile.validate()
+	if not profile_problems.is_empty():
+		return "community bundle performance profile is invalid"
 
 	var new_track_root := Node3D.new()
 	new_track_root.name = "TrackRuntime"
@@ -134,14 +149,8 @@ func mount_community_bundle(bundle: Dictionary) -> String:
 	new_track_root.add_child(track_collision)
 	var new_areas: Array[Area3D] = []
 	for index in range(checkpoints.size()):
-		var checkpoint = checkpoints[index]
-		if not checkpoint is Dictionary:
-			new_track_root.free()
-			return "community checkpoint must be an object"
+		var checkpoint: Dictionary = checkpoints[index]
 		var area := _make_declared_checkpoint(checkpoint, index)
-		if area == null:
-			new_track_root.free()
-			return "community checkpoint is malformed"
 		new_track_root.add_child(area)
 		new_areas.append(area)
 
@@ -155,8 +164,8 @@ func mount_community_bundle(bundle: Dictionary) -> String:
 	_next_checkpoint = 0
 	_lap = 0
 
-	active_car_content_id = str(bundle["car_content_id"])
-	active_track_content_id = str(bundle["track_content_id"])
+	active_car_content_id = car_content_id
+	active_track_content_id = track_content_id
 	var car_manifest: Dictionary = bundle["car_manifest"]
 	var visual_scale := 1.0
 	if car_manifest.get("visual") is Dictionary:
@@ -177,11 +186,22 @@ func restore_generated_content() -> void:
 	set_realism(starting_realism)
 	reset_vehicle()
 
+func _checkpoint_definition_valid(value: Variant) -> bool:
+	if not value is Dictionary:
+		return false
+	if not value.get("position") is Array or value["position"].size() != 3:
+		return false
+	if not value.get("size") is Array or value["size"].size() != 3:
+		return false
+	for component in value["position"]:
+		if not (component is int or component is float) or not is_finite(float(component)):
+			return false
+	for component in value["size"]:
+		if not (component is int or component is float) or not is_finite(float(component)) or float(component) <= 0.0:
+			return false
+	return true
+
 func _make_declared_checkpoint(checkpoint: Dictionary, index: int) -> Area3D:
-	if not checkpoint.get("position") is Array or checkpoint["position"].size() != 3:
-		return null
-	if not checkpoint.get("size") is Array or checkpoint["size"].size() != 3:
-		return null
 	var position_values: Array = checkpoint["position"]
 	var size_values: Array = checkpoint["size"]
 	var area := Area3D.new()
