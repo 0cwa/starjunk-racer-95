@@ -151,16 +151,18 @@ func _collect_collision_meshes(node: Node, parent_transform: Transform3D, output
 		current_transform = parent_transform * node.transform
 
 	if node is MeshInstance3D and node.mesh != null:
+		var mesh_instance := node as MeshInstance3D
+		var mesh: Mesh = mesh_instance.mesh
 		stats["meshes"] = int(stats["meshes"]) + 1
 		if int(stats["meshes"]) > MAX_COLLISION_MESHES:
 			return "mesh count exceeds %d" % MAX_COLLISION_MESHES
-		var faces := node.mesh.get_faces()
+		var faces: PackedVector3Array = mesh.get_faces()
 		if faces.size() % 3 != 0:
 			return "mesh face list is not triangulated"
 		stats["triangles"] = int(stats["triangles"]) + int(faces.size() / 3)
 		if int(stats["triangles"]) > MAX_COLLISION_TRIANGLES:
 			return "triangle count exceeds %d" % MAX_COLLISION_TRIANGLES
-		var shape := node.mesh.create_trimesh_shape()
+		var shape: ConcavePolygonShape3D = mesh.create_trimesh_shape()
 		if shape == null:
 			return "unable to create trimesh collision shape"
 		var body := StaticBody3D.new()
