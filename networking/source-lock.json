@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "goblins": {
+    "version": "0.18.0",
+    "release": "https://files.spritely.institute/releases/guile-goblins/guile-goblins-0.18.0.tar.gz",
+    "guix_sha256_base32": "0gj5018wmq97ln1z7x03a13z3p35xc8762id9bl9fgkxwm01df1a"
+  },
+  "hoot": {
+    "version": "0.9.0",
+    "release_family": "https://files.spritely.institute/releases/guile-hoot/"
+  },
+  "starjunk_control_protocol": "starjunk95/race-control/1",
+  "starjunk_realtime_protocol": "starjunk95/race-state/1"
+}
