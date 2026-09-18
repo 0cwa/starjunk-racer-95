@@ -7,10 +7,13 @@ const COLLISION_PATH := TEMP_ROOT + "/collision.glb"
 var _failures := PackedStringArray()
 
 func _ready() -> void:
+	print("TRACK_IMPORT_TEST_PHASE:start")
 	var make_dir_error := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(TEMP_ROOT))
 	_check(make_dir_error == OK or make_dir_error == ERR_ALREADY_EXISTS, "test package directory should exist")
 	_check(_write_environment_glb(), "environment GLB should export")
+	print("TRACK_IMPORT_TEST_PHASE:environment_written")
 	_check(_write_collision_glb(), "collision GLB should export")
+	print("TRACK_IMPORT_TEST_PHASE:collision_written")
 
 	var manifest := {
 		"format": "starjunk95/track/1",
@@ -26,7 +29,9 @@ func _ready() -> void:
 		],
 	}
 	var importer := CommunityTrackImporter.new()
+	print("TRACK_IMPORT_TEST_PHASE:before_import")
 	var result := importer.import_track(TEMP_ROOT, manifest)
+	print("TRACK_IMPORT_TEST_PHASE:after_import")
 	_check(bool(result.get("ok", false)), "embedded GLB track should import: %s" % str(result.get("error", "")))
 	if bool(result.get("ok", false)):
 		var visual: Node = result["visual"]
