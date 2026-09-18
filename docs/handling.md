@@ -41,3 +41,13 @@ Before adding multiple final profiles, build automated micro-tracks and telemetr
 Longitudinal and lateral requests are constrained by a normalized friction ellipse. This is where braking/throttle must give up lateral authority during hard combined manoeuvres instead of allowing impossible independent peak forces.
 
 The model is deliberately independent of `RigidBody3D`, suspension raycasts and input code so it can be unit-tested and reused by headless balance simulations.
+
+## Wheel slip kinematics
+
+`WheelSlipKinematics` converts contact-patch motion into the slip quantities consumed by tyre forces.
+
+Lateral slip angle uses velocity in the wheel's **steered local frame** and floors the longitudinal reference speed near rest, preventing tiny lateral noise from becoming an artificial 90-degree tyre event.
+
+Longitudinal slip compares wheel circumferential speed with road speed using a symmetric, low-speed-safe denominator. Pure rolling is zero, a locked wheel under forward motion is -1, and driven-wheel overspeed is positive.
+
+The future wheel controller is responsible for transforming the rigid body's point velocity into each steered wheel frame before using these helpers.

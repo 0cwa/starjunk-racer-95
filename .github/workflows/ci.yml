@@ -33,6 +33,8 @@ jobs:
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/vehicle_handling_test.tscn'
       - name: Run tire force model tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/tire_force_model_test.tscn'
+      - name: Run wheel slip kinematics tests
+        run: '"$GODOT_BIN" --headless --path game res://tests/unit/wheel_slip_kinematics_test.tscn'
       - name: Run community package safety tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/content_package_test.tscn'
       - name: Load renderer torture scene
