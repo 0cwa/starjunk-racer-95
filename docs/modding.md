@@ -56,6 +56,17 @@ Installing the same bytes again deduplicates to the existing directory. Resolvin
 
 The library has no mutable index inside package directories; enumeration scans digest directories and returns verified packages separately from corrupt entries. This keeps content identity stable and gives Spritely capabilities a durable local object to resolve by exact ID.
 
+## Content service boundary
+
+`CommunityContentService` is the application-facing entry point for local community content. UI and future Spritely adapters should use this service instead of manipulating staging directories or package roots directly.
+
+- `install_zip()` stages an untrusted ZIP under a service-owned temporary `user://` directory, validates/extracts it through `CommunityPackageArchive`, installs the verified bytes in `CommunityContentLibrary`, and removes staging data on both success and failure.
+- `catalog()` exposes verified metadata suitable for selection UI without exposing mutable filesystem roots.
+- `build_race_bundle(car_content_id, track_content_id)` resolves and re-hashes the immutable IDs, verifies car/track package kinds, imports them through `CommunityRaceBundle`, and requires the returned IDs to match the requested IDs before returning runtime nodes.
+- `uninstall()` delegates to the content-addressed library.
+
+The final content-ID comparison closes the time-of-check/time-of-use gap between library resolution and GLB import. The playable race still receives only a sanitized bundle and never receives archive, hash, or path authority.
+
 ## Runtime car visual import
 
 `CommunityCarImporter` now loads a validated car GLB at runtime.
