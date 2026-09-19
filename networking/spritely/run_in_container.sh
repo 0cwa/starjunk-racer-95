@@ -53,7 +53,7 @@ console.log(JSON.stringify(WebAssembly.Module.imports(module), null, 2));
 NODE
 
 test -s build/spritely/starjunk-spritely-room.imports.json
-grep -q '"module": "crypto"' build/spritely/starjunk-spritely-room.imports.json
+node networking/spritely/tests/browser-host-contract.mjs   build/spritely/starjunk-spritely-room.imports.json
 
 cat build/spritely/starjunk-spritely-room.imports.json
-printf 'Spritely native + browser compile probes passed\n'
+printf 'Spritely native + browser compile/host probes passed\n'
