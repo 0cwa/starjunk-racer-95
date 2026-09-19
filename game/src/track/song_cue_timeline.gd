@@ -64,7 +64,7 @@ func advance_to(time_ms: int) -> Array[Dictionary]:
 static func validate(cue_set: Dictionary) -> String:
 	if str(cue_set.get("format", "")) != FORMAT:
 		return "unsupported cue-set format"
-	if not cue_set.get("duration_ms") is int:
+	if not _json_integer(cue_set.get("duration_ms")):
 		return "duration_ms must be an integer"
 	var duration := int(cue_set["duration_ms"])
 	if duration <= 0 or duration > MAX_DURATION_MS:
@@ -91,7 +91,7 @@ static func validate(cue_set: Dictionary) -> String:
 		if ids.has(cue_id):
 			return "cue ids must be unique"
 		ids[cue_id] = true
-		if not cue["time_ms"] is int:
+		if not _json_integer(cue["time_ms"]):
 			return "cue time_ms must be an integer"
 		var cue_time := int(cue["time_ms"])
 		if cue_time < 0 or cue_time > duration:
@@ -107,6 +107,13 @@ static func validate(cue_set: Dictionary) -> String:
 			if not payload_error.is_empty():
 				return payload_error
 	return ""
+
+static func _json_integer(value: Variant) -> bool:
+	if value is int:
+		return true
+	if value is float:
+		return is_finite(value) and is_equal_approx(value, round(value))
+	return false
 
 static func _validate_json_value(value: Variant, depth: int) -> String:
 	if depth > 8:

@@ -69,7 +69,10 @@ func snapshot_state() -> Dictionary:
 
 func emit_current_state() -> void:
 	for kind in PERSISTENT_KINDS:
-		var payload: Dictionary = _persistent_state[kind]
+		var payload_value = _persistent_state.get(kind, {})
+		if not payload_value is Dictionary:
+			continue
+		var payload: Dictionary = payload_value
 		if not payload.is_empty():
 			_emit_kind(kind, payload.duplicate(true))
 
