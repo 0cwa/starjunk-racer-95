@@ -20,7 +20,6 @@ jobs:
     timeout-minutes: 60
     env:
       EM_VERSION: "6.0.9"
-      EM_CACHE: ${{ github.workspace }}/.cache/emscripten
       SCONS_CACHE: ${{ github.workspace }}/.cache/scons-godot-webgpu
       STARJUNK_CARGO_TARGET_ROOT: ${{ github.workspace }}/.cache/cargo-webgpu
     steps:
@@ -29,12 +28,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            .cache/emscripten
             .cache/scons-godot-webgpu
             .cache/cargo-webgpu
-          key: webgpu-${{ runner.os }}-emscripten-${{ env.EM_VERSION }}-${{ hashFiles('engine/source-lock.json', 'tools/engine/apply_starjunk_port_patches.py', 'tools/engine/build_webgpu_rust_deps.sh') }}
+          key: webgpu-${{ runner.os }}-toolchain-${{ env.EM_VERSION }}-${{ hashFiles('engine/source-lock.json', 'tools/engine/apply_starjunk_port_patches.py', 'tools/engine/build_webgpu_rust_deps.sh') }}
           restore-keys: |
-            webgpu-${{ runner.os }}-emscripten-${{ env.EM_VERSION }}-
+            webgpu-${{ runner.os }}-toolchain-${{ env.EM_VERSION }}-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -43,8 +41,6 @@ jobs:
         with:
           version: ${{ env.EM_VERSION }}
           no-cache: true
-      - name: Prime Emscripten sysroot
-        run: embuilder build sysroot
       - name: Install SCons
         run: python3 -m pip install scons
       - name: Prepare merged Godot 4.7.2 + WebGPU candidate
