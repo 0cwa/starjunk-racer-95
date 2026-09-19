@@ -70,6 +70,8 @@ jobs:
         run: 'timeout 30s "$GODOT_BIN" --headless --path game res://tests/unit/community_package_archive_test.tscn'
       - name: Run package content identity tests
         run: 'timeout 30s "$GODOT_BIN" --headless --path game res://tests/unit/community_package_identity_test.tscn'
+      - name: Run content-addressed community library tests
+        run: 'timeout 45s "$GODOT_BIN" --headless --path game res://tests/unit/community_content_library_test.tscn'
       - name: Run community car runtime importer tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/community_car_importer_test.tscn'
       - name: Run community track runtime importer tests

@@ -41,6 +41,21 @@ Race invitations should ultimately bind both so a mutable publisher capability c
 
 The identity builder rejects symlinks/reparse points and applies the same path/count/file/total-size limits as archive staging. Hashing is streamed in chunks rather than loading large package files into memory.
 
+## Content-addressed local library
+
+`CommunityContentLibrary` persists validated packages under `user://starjunk95/library/<sha256-digest>/`. The directory name comes only from a strictly validated SHA-256 content ID; user-supplied paths are never joined into the library root.
+
+Installation is transactional:
+
+1. build the staged package's canonical `CommunityPackageIdentity` descriptor;
+2. copy files into a fresh temporary sibling while re-checking portable paths and refusing links;
+3. rebuild the descriptor from the copied bytes and require the exact same content ID;
+4. atomically rename the verified temporary directory to its immutable digest path.
+
+Installing the same bytes again deduplicates to the existing directory. Resolving an installed content ID re-hashes the directory every time, so manual disk changes are surfaced as integrity failures rather than silently becoming new trusted content.
+
+The library has no mutable index inside package directories; enumeration scans digest directories and returns verified packages separately from corrupt entries. This keeps content identity stable and gives Spritely capabilities a durable local object to resolve by exact ID.
+
 ## Runtime car visual import
 
 `CommunityCarImporter` now loads a validated car GLB at runtime.
