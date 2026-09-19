@@ -69,15 +69,14 @@ func _ready() -> void:
 
 	_race.advance_presentation_to(1200)
 	_check(key_light.light_energy > 2.0, "beat cue should create a temporary render-only light pulse")
-	for _index in range(30):
-		await get_tree().process_frame
-	_check(absf(key_light.light_energy - 2.0) < 0.05, "beat pulse should decay back to persistent light energy")
+	_race.presentation_adapter._process(0.25)
+	_check(absf(key_light.light_energy - 2.0) < 0.001, "beat pulse should decay back to persistent light energy")
 
 	var seek_error := _race.seek_presentation_to(500)
 	_check(seek_error.is_empty(), "presentation seek should succeed")
 	_check(absf(key_light.light_energy - 2.0) < 0.001, "seek should clear transient beat pulse")
-	_check(absf(sparkles.amount_ratio - 0.25) < 0.001, "seek should not replay or reset transient particle cue state")
-	_check(absf(rail_material.emission_energy_multiplier - 4.0) < 0.001, "seek before scenery cue should not mutate adapter target until persistent state is emitted")
+	_check(absf(sparkles.amount_ratio - 1.0) < 0.001, "seek should clear transient particle target back to its baseline")
+	_check(absf(rail_material.emission_energy_multiplier - 2.6) < 0.001, "seek before scenery cue should restore baseline scenery state")
 	_finish()
 
 func _check(condition: bool, message: String) -> void:

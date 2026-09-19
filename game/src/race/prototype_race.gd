@@ -110,8 +110,6 @@ func configure_presentation(cue_set: Dictionary) -> String:
 	if not error.is_empty():
 		return error
 	_refresh_presentation_targets()
-	presentation_adapter.clear_transients()
-	presentation_director.emit_current_state()
 	return ""
 
 func advance_presentation_to(time_ms: int) -> Array[Dictionary]:
@@ -125,7 +123,7 @@ func seek_presentation_to(time_ms: int) -> String:
 	var error := presentation_director.seek_to(time_ms)
 	if not error.is_empty():
 		return error
-	presentation_adapter.clear_transients()
+	presentation_adapter.reset_to_baseline()
 	presentation_director.emit_current_state()
 	return ""
 
@@ -449,6 +447,9 @@ func _refresh_presentation_targets() -> void:
 		_track_sparkles,
 		_presentation_materials
 	)
+	presentation_adapter.reset_to_baseline()
+	if presentation_director != null:
+		presentation_director.emit_current_state()
 
 func _build_vehicle(
 		profile: VehiclePerformanceProfile = null,

@@ -13,6 +13,15 @@ var _key_light: Light3D
 var _particles: GPUParticles3D
 var _scenery_materials: Array[StandardMaterial3D] = []
 
+var _baseline_background_color := Color.BLACK
+var _baseline_ambient_color := Color.BLACK
+var _baseline_ambient_energy := 1.0
+var _baseline_glow_intensity := 1.0
+var _baseline_light_energy := 1.0
+var _baseline_light_color := Color.WHITE
+var _baseline_particle_amount_ratio := 1.0
+var _baseline_scenery_emissions: Array[float] = []
+
 var _base_light_energy := 1.0
 var _beat_strength := 0.0
 var _beat_duration_seconds := 0.0
@@ -38,13 +47,53 @@ func set_targets(
 		particles: GPUParticles3D = null,
 		scenery_materials: Array[StandardMaterial3D] = []
 ) -> void:
+	var environment_changed := environment != _environment
+	var light_changed := key_light != _key_light
+	var particles_changed := particles != _particles
+	var scenery_changed := _scenery_targets_changed(scenery_materials)
+
 	_environment = environment
 	_key_light = key_light
 	_particles = particles
 	_scenery_materials = scenery_materials.duplicate()
+
+	if environment_changed and _environment != null:
+		_baseline_background_color = _environment.background_color
+		_baseline_ambient_color = _environment.ambient_light_color
+		_baseline_ambient_energy = _environment.ambient_light_energy
+		_baseline_glow_intensity = _environment.glow_intensity
+	if light_changed and _key_light != null:
+		_baseline_light_energy = _key_light.light_energy
+		_baseline_light_color = _key_light.light_color
+		_base_light_energy = _baseline_light_energy
+	if particles_changed and _particles != null:
+		_baseline_particle_amount_ratio = _particles.amount_ratio
+	if scenery_changed:
+		_baseline_scenery_emissions.clear()
+		for material in _scenery_materials:
+			_baseline_scenery_emissions.append(
+				material.emission_energy_multiplier if material != null else 0.0
+		)
+
+	_apply_light_energy()
+
+func reset_to_baseline() -> void:
+	clear_transients()
+	if _environment != null:
+		_environment.background_color = _baseline_background_color
+		_environment.ambient_light_color = _baseline_ambient_color
+		_environment.ambient_light_energy = _baseline_ambient_energy
+		_environment.glow_intensity = _baseline_glow_intensity
 	if _key_light != null:
-		_base_light_energy = _key_light.light_energy
+		_base_light_energy = _baseline_light_energy
+		_key_light.light_color = _baseline_light_color
 		_apply_light_energy()
+	if _particles != null:
+		_particles.amount_ratio = _baseline_particle_amount_ratio
+	for index in range(mini(_scenery_materials.size(), _baseline_scenery_emissions.size())):
+		var material := _scenery_materials[index]
+		if material != null:
+			material.emission_energy_multiplier = _baseline_scenery_emissions[index]
 
 func clear_transients() -> void:
 	_beat_strength = 0.0
@@ -57,6 +106,14 @@ func _process(delta: float) -> void:
 		return
 	_beat_remaining_seconds = maxf(_beat_remaining_seconds - maxf(delta, 0.0), 0.0)
 	_apply_light_energy()
+
+func _scenery_targets_changed(next_materials: Array[StandardMaterial3D]) -> bool:
+	if next_materials.size() != _scenery_materials.size():
+		return true
+	for index in range(next_materials.size()):
+		if next_materials[index] != _scenery_materials[index]:
+			return true
+	return false
 
 func _disconnect_director() -> void:
 	if _director == null:
