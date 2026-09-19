@@ -8,9 +8,16 @@ See `source-lock.json`.
 
 ## Browser shape
 
-The browser build should run a Hoot-compiled Goblins module next to Godot Web/WebGPU. Godot sees only a narrow bridge API and JSON-compatible `RaceProtocol` payloads; it does not import Goblins actor concepts.
+The browser build runs a Hoot-compiled Goblins module next to Godot Web/WebGPU. Godot sees only a narrow bridge API and JSON-compatible `RaceProtocol` payloads; it does not import Goblins actor concepts.
 
 Goblins' browser-capable WebSocket netlayer is a bootstrap route. Browser clients cannot host WebSocket servers, so decentralized reachability should use the Prelay model (or a later suitable netlayer) rather than pretending a browser tab is a directly reachable server.
+
+The executable browser boundary is split in two:
+
+- `browser-host.mjs` supplies only ambient browser primitives required by Goblins (WebCrypto, typed arrays and WebSocket).
+- `browser-race-bridge.mjs` owns the game-facing race-domain façade. The Hoot reflected procedure is private to this module and must never be returned to Godot.
+
+The initial façade exposes only primitive values: control-protocol identity, browser CapTP availability, and canonical ready-content validation. CI exercises those calls in Chromium through the actual compiled Scheme dispatcher. New operations must preserve this rule: browser callers receive JSON-compatible data or opaque OCapN strings, never Scheme/Goblins objects.
 
 ## Two planes
 
@@ -57,7 +64,8 @@ The bridge between Godot and Goblins must:
 3. enforce size/rate limits independently of the remote peer;
 4. surface disconnect/reconnect as state, not fatal process errors;
 5. never expose ambient filesystem/network authority to downloaded mods;
-6. preserve OCapN references as opaque strings on the Godot side.
+6. preserve OCapN references as opaque strings on the Godot side;
+7. keep reflected Scheme procedures, actor references and vows private to the browser networking module.
 
 ## Persistence
 

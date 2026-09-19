@@ -9,5 +9,16 @@
                 #:verify-certificates? #t)))
     (spawn-mycapn netlayer)))
 
-(list race-control-protocol
-      (procedure? make-browser-capn))
+(define (browser-bridge-dispatch operation . args)
+  (cond
+   ((string=? operation "control-protocol")
+    race-control-protocol)
+   ((string=? operation "browser-capn-supported")
+    (procedure? make-browser-capn))
+   ((string=? operation "ready-content-valid")
+    (and (= (length args) 2)
+         (ready-content-valid? (car args) (cadr args))))
+   (else
+    (error "unknown Starjunk browser bridge operation" operation))))
+
+browser-bridge-dispatch

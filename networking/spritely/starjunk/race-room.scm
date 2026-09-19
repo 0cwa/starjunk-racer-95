@@ -1,7 +1,10 @@
 (define-module (starjunk race-room)
   #:use-module (goblins)
   #:use-module (goblins actor-lib methods)
-  #:export (^race-room ^racer-facet race-control-protocol))
+  #:export (^race-room
+            ^racer-facet
+            race-control-protocol
+            ready-content-valid?))
 
 (define race-control-protocol "starjunk95/race-control/3")
 
@@ -18,14 +21,17 @@
                              (char<=? ch #\f)))
                     (loop (+ index 1))))))))
 
+(define (ready-content-valid? car-content-id track-content-id)
+  (and (canonical-sha256-content-id? car-content-id)
+       (canonical-sha256-content-id? track-content-id)))
+
 (define-actor (^racer-facet _bcom racer-id)
   (methods
    [(id) racer-id]
    [(ready value car-content-id track-content-id)
     (and (boolean? value)
          value
-         (canonical-sha256-content-id? car-content-id)
-         (canonical-sha256-content-id? track-content-id))]))
+         (ready-content-valid? car-content-id track-content-id))]))
 
 (define-actor (^race-room _bcom)
   (methods
