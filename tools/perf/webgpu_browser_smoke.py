@@ -46,6 +46,7 @@ class CDP:
     def __init__(self, url: str) -> None:
         self.ws = websocket.create_connection(url, timeout=5)
         self.next_id = 1
+        self.events: list[dict] = []
 
     def close(self) -> None:
         self.ws.close()
@@ -63,6 +64,7 @@ class CDP:
                 if "error" in message:
                     raise RuntimeError(f"CDP {method} failed: {message['error']}")
                 return message.get("result", {})
+            self.events.append(message)
         raise TimeoutError(f"Timed out waiting for CDP {method}")
 
     def evaluate(self, expression: str, await_promise: bool = False, timeout: float = 15.0):
@@ -97,6 +99,68 @@ def wait_for_page(debug_port: int, timeout: float) -> str:
     raise TimeoutError("Chromium DevTools page target did not appear")
 
 
+def tail_text(path: Path, limit: int = 12000) -> str:
+    try:
+        data = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    return data[-limit:]
+
+
+def summarize_cdp_events(events: list[dict]) -> dict:
+    console: list[dict] = []
+    exceptions: list[dict] = []
+    network_failures: list[dict] = []
+    log_entries: list[dict] = []
+
+    for event in events[-500:]:
+        method = event.get("method")
+        params = event.get("params", {})
+        if method == "Runtime.consoleAPICalled":
+            values = []
+            for arg in params.get("args", [])[:12]:
+                values.append(arg.get("value", arg.get("description", arg.get("type", ""))))
+            console.append({
+                "type": params.get("type", ""),
+                "values": values,
+                "timestamp": params.get("timestamp"),
+            })
+        elif method == "Runtime.exceptionThrown":
+            details = params.get("exceptionDetails", {})
+            exception = details.get("exception", {})
+            exceptions.append({
+                "text": details.get("text", ""),
+                "description": exception.get("description", ""),
+                "url": details.get("url", ""),
+                "line": details.get("lineNumber"),
+                "column": details.get("columnNumber"),
+            })
+        elif method == "Network.loadingFailed":
+            network_failures.append({
+                "request_id": params.get("requestId", ""),
+                "type": params.get("type", ""),
+                "error_text": params.get("errorText", ""),
+                "canceled": params.get("canceled", False),
+                "blocked_reason": params.get("blockedReason", ""),
+            })
+        elif method == "Log.entryAdded":
+            entry = params.get("entry", {})
+            log_entries.append({
+                "source": entry.get("source", ""),
+                "level": entry.get("level", ""),
+                "text": entry.get("text", ""),
+                "url": entry.get("url", ""),
+                "line": entry.get("lineNumber"),
+            })
+
+    return {
+        "console": console[-120:],
+        "exceptions": exceptions[-80:],
+        "network_failures": network_failures[-80:],
+        "log_entries": log_entries[-120:],
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", required=True)
@@ -125,6 +189,12 @@ def main() -> int:
 
     chrome = find_chrome()
     profile_dir = tempfile.mkdtemp(prefix="starjunk-chrome-")
+    profile_path = Path(profile_dir)
+    stdout_path = profile_path / "chrome.stdout.log"
+    stderr_path = profile_path / "chrome.stderr.log"
+    stdout_handle = stdout_path.open("w", encoding="utf-8")
+    stderr_handle = stderr_path.open("w", encoding="utf-8")
+
     url = f"http://127.0.0.1:{http_port}/index.html"
     flags = [
         chrome,
@@ -145,22 +215,60 @@ def main() -> int:
         "--use-angle=swiftshader",
         "--use-vulkan=swiftshader",
         "--window-size=1280,720",
-        url,
+        "about:blank",
     ]
     if os.geteuid() == 0:
         flags.append("--no-sandbox")
 
     browser = subprocess.Popen(
         flags,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=stdout_handle,
+        stderr=stderr_handle,
         text=True,
     )
     cdp: CDP | None = None
     try:
         ws_url = wait_for_page(debug_port, 15.0)
         cdp = CDP(ws_url)
-        cdp.call("Runtime.enable")
+        for domain in ("Runtime", "Log", "Network", "Page"):
+            cdp.call(f"{domain}.enable")
+
+        cdp.call(
+            "Page.addScriptToEvaluateOnNewDocument",
+            {
+                "source": """
+window.__STARJUNK_BROWSER_EVENTS__ = [];
+window.addEventListener('error', (event) => {
+    window.__STARJUNK_BROWSER_EVENTS__.push({
+        type: 'error',
+        message: String(event.message || ''),
+        filename: String(event.filename || ''),
+        line: event.lineno || 0,
+        column: event.colno || 0,
+        stack: event.error && event.error.stack ? String(event.error.stack) : ''
+    });
+});
+window.addEventListener('unhandledrejection', (event) => {
+    const reason = event.reason;
+    window.__STARJUNK_BROWSER_EVENTS__.push({
+        type: 'unhandledrejection',
+        message: String(reason && reason.message ? reason.message : reason),
+        stack: reason && reason.stack ? String(reason.stack) : ''
+    });
+});
+"""
+            },
+        )
+        cdp.call("Page.navigate", {"url": url})
+
+        load_deadline = time.monotonic() + 20.0
+        while time.monotonic() < load_deadline:
+            state = cdp.evaluate(
+                "({ready: document.readyState, href: location.href, engine: typeof Engine, godot: typeof Godot})"
+            )
+            if state and state.get("href") == url and state.get("ready") == "complete":
+                break
+            time.sleep(0.1)
 
         adapter_probe = cdp.evaluate(
             """(async () => {
@@ -194,25 +302,63 @@ def main() -> int:
             if payload is not None:
                 break
             time.sleep(0.5)
+
         if payload is None:
             diagnostics = cdp.evaluate("""({
                 ready_state: document.readyState,
                 title: document.title,
-                body_text: (document.body && document.body.innerText || "").slice(0, 4000),
                 location: location.href,
-                starjunk_globals: Object.keys(window).filter(k => k.includes("STARJUNK")).sort()
+                body_text: (document.body && document.body.innerText || "").slice(0, 4000),
+                body_html: (document.body && document.body.innerHTML || "").slice(0, 12000),
+                engine_type: typeof Engine,
+                godot_type: typeof Godot,
+                godot_config: (typeof GODOT_CONFIG !== 'undefined') ? GODOT_CONFIG : null,
+                cross_origin_isolated: self.crossOriginIsolated,
+                secure_context: self.isSecureContext,
+                starjunk_globals: Object.keys(window).filter(k => k.includes("STARJUNK")).sort(),
+                canvas: Array.from(document.querySelectorAll('canvas')).map(c => ({
+                    id: c.id, width: c.width, height: c.height,
+                    client_width: c.clientWidth, client_height: c.clientHeight
+                })),
+                status: (() => {
+                    const root = document.getElementById('status');
+                    const notice = document.getElementById('status-notice');
+                    const progress = document.getElementById('status-progress');
+                    return {
+                        exists: !!root,
+                        visibility: root ? getComputedStyle(root).visibility : '',
+                        notice_text: notice ? notice.innerText : '',
+                        notice_display: notice ? getComputedStyle(notice).display : '',
+                        progress_display: progress ? getComputedStyle(progress).display : ''
+                    };
+                })(),
+                scripts: Array.from(document.scripts).map(s => s.src || '[inline]'),
+                resources: performance.getEntriesByType('resource').map(r => ({
+                    name: r.name,
+                    initiator_type: r.initiatorType,
+                    duration_ms: r.duration,
+                    transfer_size: r.transferSize,
+                    decoded_body_size: r.decodedBodySize
+                })).slice(-80),
+                browser_events: window.__STARJUNK_BROWSER_EVENTS__ || []
             })""")
+            stdout_handle.flush()
+            stderr_handle.flush()
             failure_result = {
-                "schema_version": 1,
+                "schema_version": 2,
                 "authoritative_performance": False,
                 "purpose": args.purpose,
                 "browser": Path(chrome).name,
                 "adapter_probe": adapter_probe,
                 "diagnostics": diagnostics,
+                "cdp_events": summarize_cdp_events(cdp.events),
+                "chromium_stdout_tail": tail_text(stdout_path),
+                "chromium_stderr_tail": tail_text(stderr_path),
                 "error": f"Timed out waiting for window.{args.result_global}",
             }
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_text(json.dumps(failure_result, indent=2) + "\n", encoding="utf-8")
+            print(json.dumps(failure_result, indent=2))
             raise TimeoutError(f"Godot WebGPU result {args.result_global!r} was not published")
 
         renderer = str(payload.get("renderer", "")).lower()
@@ -227,12 +373,13 @@ def main() -> int:
             )
 
         result = {
-            "schema_version": 1,
+            "schema_version": 2,
             "authoritative_performance": False,
             "purpose": args.purpose,
             "browser": Path(chrome).name,
             "adapter_probe": adapter_probe,
             "payload": payload,
+            "cdp_events": summarize_cdp_events(cdp.events),
         }
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
@@ -247,12 +394,13 @@ def main() -> int:
         except subprocess.TimeoutExpired:
             browser.kill()
             browser.wait(timeout=5)
+        stdout_handle.close()
+        stderr_handle.close()
         server.shutdown()
         server.server_close()
-        shutil.rmtree(profile_dir, ignore_errors=True)
         if browser.returncode not in (None, 0, -15):
-            stderr = browser.stderr.read() if browser.stderr else ""
-            print("Chromium stderr:\n" + stderr[-8000:])
+            print("Chromium stderr:\n" + tail_text(stderr_path))
+        shutil.rmtree(profile_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":

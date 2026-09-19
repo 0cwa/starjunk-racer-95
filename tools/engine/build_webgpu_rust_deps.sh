@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LOCK="$ROOT/engine/source-lock.json"
 GODOT_SOURCE="${1:-$ROOT/build/webgpu-port-candidate/godot}"
 WORK_ROOT="${2:-$ROOT/build/webgpu-rust-deps}"
+TARGET_ROOT="${STARJUNK_CARGO_TARGET_ROOT:-$WORK_ROOT/cargo-target}"
 
 if [[ ! -f "$GODOT_SOURCE/SConstruct" ]]; then
   echo "Godot candidate source not found: $GODOT_SOURCE" >&2
@@ -35,7 +36,7 @@ test "$(tr -d '\r\n' < "$GODOT_SOURCE/thirdparty/naga-native/TAG")" = "$NAGA_SHA
 test "$(tr -d '\r\n' < "$GODOT_SOURCE/thirdparty/spirv-webgpu-transform/TAG")" = "$SPIRV_SHA"
 
 rm -rf "$WORK_ROOT"
-mkdir -p "$WORK_ROOT"
+mkdir -p "$WORK_ROOT" "$TARGET_ROOT"
 
 clone_at() {
   local repo="$1"
@@ -55,7 +56,11 @@ rustup target add wasm32-unknown-emscripten
 # naga-native generates Rust FFI bindings from its C header during the build.
 # Bindgen otherwise discovers the host's /usr/include even though rustc targets
 # Emscripten. Force Clang to use the same target/sysroot as emcc.
-EMSCRIPTEN_SYSROOT="${EMSDK:?EMSDK must be set by the Emscripten environment}/upstream/emscripten/cache/sysroot"
+if [[ -n "${EM_CACHE:-}" ]]; then
+  EMSCRIPTEN_SYSROOT="$EM_CACHE/sysroot"
+else
+  EMSCRIPTEN_SYSROOT="${EMSDK:?EMSDK must be set by the Emscripten environment}/upstream/emscripten/cache/sysroot"
+fi
 test -d "$EMSCRIPTEN_SYSROOT"
 export BINDGEN_EXTRA_CLANG_ARGS_wasm32_unknown_emscripten="--target=wasm32-unknown-emscripten --sysroot=$EMSCRIPTEN_SYSROOT"
 export BINDGEN_EXTRA_CLANG_ARGS_wasm32_unknown_emscripten_unknown="${BINDGEN_EXTRA_CLANG_ARGS_wasm32_unknown_emscripten}"
@@ -67,12 +72,22 @@ export AR_wasm32_unknown_emscripten=emar
 # Naga front/back end even though exported functions are feature-gated. Build
 # the pinned default feature set for correctness; a future narrow FFI wrapper
 # can reduce size once this renderer path is proven.
-cargo build --manifest-path "$WORK_ROOT/naga-native/Cargo.toml" --release --locked --target wasm32-unknown-emscripten
+cargo build \
+  --manifest-path "$WORK_ROOT/naga-native/Cargo.toml" \
+  --release \
+  --locked \
+  --target wasm32-unknown-emscripten \
+  --target-dir "$TARGET_ROOT/naga-native"
 
-cargo build   --manifest-path "$WORK_ROOT/spirv-webgpu-transform/ffi/Cargo.toml"   --release   --locked   --target wasm32-unknown-emscripten
+cargo build \
+  --manifest-path "$WORK_ROOT/spirv-webgpu-transform/ffi/Cargo.toml" \
+  --release \
+  --locked \
+  --target wasm32-unknown-emscripten \
+  --target-dir "$TARGET_ROOT/spirv-webgpu-transform"
 
-NAGA_LIB="$WORK_ROOT/naga-native/target/wasm32-unknown-emscripten/release/libnaga_native.a"
-SPIRV_LIB="$WORK_ROOT/spirv-webgpu-transform/target/wasm32-unknown-emscripten/release/libspirv_webgpu_transform_ffi.a"
+NAGA_LIB="$TARGET_ROOT/naga-native/wasm32-unknown-emscripten/release/libnaga_native.a"
+SPIRV_LIB="$TARGET_ROOT/spirv-webgpu-transform/wasm32-unknown-emscripten/release/libspirv_webgpu_transform_ffi.a"
 
 test -s "$NAGA_LIB"
 test -s "$SPIRV_LIB"

@@ -20,8 +20,21 @@ jobs:
     timeout-minutes: 60
     env:
       EM_VERSION: "6.0.9"
+      EM_CACHE: ${{ github.workspace }}/.cache/emscripten
+      SCONS_CACHE: ${{ github.workspace }}/.cache/scons-godot-webgpu
+      STARJUNK_CARGO_TARGET_ROOT: ${{ github.workspace }}/.cache/cargo-webgpu
     steps:
       - uses: actions/checkout@v4
+      - name: Restore WebGPU build caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/emscripten
+            .cache/scons-godot-webgpu
+            .cache/cargo-webgpu
+          key: webgpu-${{ runner.os }}-emscripten-${{ env.EM_VERSION }}-${{ hashFiles('engine/source-lock.json', 'tools/engine/apply_starjunk_port_patches.py', 'tools/engine/build_webgpu_rust_deps.sh') }}
+          restore-keys: |
+            webgpu-${{ runner.os }}-emscripten-${{ env.EM_VERSION }}-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -30,6 +43,8 @@ jobs:
         with:
           version: ${{ env.EM_VERSION }}
           no-cache: true
+      - name: Prime Emscripten sysroot
+        run: embuilder build sysroot
       - name: Install SCons
         run: python3 -m pip install scons
       - name: Prepare merged Godot 4.7.2 + WebGPU candidate
@@ -48,6 +63,8 @@ jobs:
             dlink_enabled=no \
             lto=none \
             debug_symbols=no \
+            cache_path="$SCONS_CACHE" \
+            cache_limit=8 \
             -j2
       - name: List build outputs
         if: always()
@@ -61,7 +78,8 @@ jobs:
         env:
           GODOT_VERSION: "4.7.2"
         run: |
-          curl -fL --retry 3 -o /tmp/godot.zip             "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl -fL --retry 3 -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
           unzip -q /tmp/godot.zip -d /tmp/godot-editor
           chmod +x /tmp/godot-editor/Godot_v${GODOT_VERSION}-stable_linux.x86_64
           echo "GODOT_BIN=/tmp/godot-editor/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "$GITHUB_ENV"
@@ -69,17 +87,37 @@ jobs:
         run: python3 -m pip install websocket-client
       - name: Export lightweight Godot WebGPU boot scene
         run: |
-          tools/engine/export_webgpu_benchmark.sh             "$GODOT_BIN"             "$GITHUB_WORKSPACE/build/webgpu-port-candidate/godot/bin/godot.web.template_release.wasm32.nothreads.zip"             "$GITHUB_WORKSPACE/build/webgpu-boot"             "res://tests/perf/webgpu_boot/webgpu_boot.tscn"
+          tools/engine/export_webgpu_benchmark.sh \
+            "$GODOT_BIN" \
+            "$GITHUB_WORKSPACE/build/webgpu-port-candidate/godot/bin/godot.web.template_release.wasm32.nothreads.zip" \
+            "$GITHUB_WORKSPACE/build/webgpu-boot" \
+            "res://tests/perf/webgpu_boot/webgpu_boot.tscn"
       - name: Run Chromium Godot WebGPU boot gate
         run: |
-          python3 tools/perf/webgpu_browser_smoke.py             --root build/webgpu-boot             --output build/webgpu-boot-smoke.json             --result-global __STARJUNK_BOOT_RESULT__             --purpose browser_webgpu_boot             --expected-profile boot             --timeout 30
+          python3 tools/perf/webgpu_browser_smoke.py \
+            --root build/webgpu-boot \
+            --output build/webgpu-boot-smoke.json \
+            --result-global __STARJUNK_BOOT_RESULT__ \
+            --purpose browser_webgpu_boot \
+            --expected-profile boot \
+            --timeout 30
           cat build/webgpu-boot-smoke.json
       - name: Export Starjunk WebGPU renderer torture scene
         run: |
-          tools/engine/export_webgpu_benchmark.sh             "$GODOT_BIN"             "$GITHUB_WORKSPACE/build/webgpu-port-candidate/godot/bin/godot.web.template_release.wasm32.nothreads.zip"             "$GITHUB_WORKSPACE/build/web-benchmark"             "res://tests/perf/renderer_torture/renderer_torture.tscn"
+          tools/engine/export_webgpu_benchmark.sh \
+            "$GODOT_BIN" \
+            "$GITHUB_WORKSPACE/build/webgpu-port-candidate/godot/bin/godot.web.template_release.wasm32.nothreads.zip" \
+            "$GITHUB_WORKSPACE/build/web-benchmark" \
+            "res://tests/perf/renderer_torture/renderer_torture.tscn"
       - name: Run Chromium WebGPU torture-feature smoke
         run: |
-          python3 tools/perf/webgpu_browser_smoke.py             --root build/web-benchmark             --output build/webgpu-browser-smoke.json             --result-global __STARJUNK_PERF_RESULT__             --purpose browser_webgpu_torture_smoke             --expected-profile browser_smoke             --timeout 120
+          python3 tools/perf/webgpu_browser_smoke.py \
+            --root build/web-benchmark \
+            --output build/webgpu-browser-smoke.json \
+            --result-global __STARJUNK_PERF_RESULT__ \
+            --purpose browser_webgpu_torture_smoke \
+            --expected-profile browser_smoke \
+            --timeout 120
           cat build/webgpu-browser-smoke.json
       - uses: actions/upload-artifact@v4
         if: always()

@@ -43,3 +43,14 @@ The next link gate exposed two intentionally external Rust static libraries. The
 ## Exit criteria
 
 The WebGPU build renders the torture workload correctly in supported desktop browsers, produces machine-readable benchmark results, and game-domain code does not know it is running on an engine fork.
+
+
+## Browser async bootstrap finding
+
+The first exported Chromium boot gate proved that the page loaded and Chrome exposed a real WebGPU adapter through SwiftShader, but the tiny Godot scene never reached GDScript. The pinned bridge used `wgpuInstanceWaitAny(..., UINT64_MAX)` under Emdawn/Asyncify for adapter creation, device creation, and readback mapping.
+
+Emscripten has a known browser failure mode where timed/infinite `wgpuInstanceWaitAny` suspension can surface an uncaught Asyncify `unwind` promise. Starjunk's Emdawn compatibility shim therefore uses zero-time `wgpuInstanceWaitAny` polling plus `emscripten_sleep(0)` between polls. This keeps the WebGPU call itself non-suspending while explicitly yielding the JavaScript event loop. Desktop Dawn retains its original blocking waits.
+
+The browser smoke harness now starts Chromium on `about:blank`, installs error/unhandled-rejection listeners before navigation, enables Runtime/Log/Network/Page DevTools domains, and records console, exception, network-failure, page-state, resource-timing, and Chromium stderr diagnostics on failure.
+
+CI also persists toolchain-keyed Emscripten, SCons, and Cargo target caches. The caches are acceleration only: SCons/compiler keys and the pinned source/toolchain lock remain authoritative.
