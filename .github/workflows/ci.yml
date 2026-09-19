@@ -62,6 +62,8 @@ jobs:
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/song_cue_timeline_test.tscn'
       - name: Run course presentation director tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/course_presentation_director_test.tscn'
+      - name: Run course visual adapter integration test
+        run: '"$GODOT_BIN" --headless --path game res://tests/integration/course_visual_adapter_test.tscn'
       - name: Run race protocol tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/race_protocol_test.tscn'
       - name: Run community package safety tests

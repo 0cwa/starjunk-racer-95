@@ -18,8 +18,14 @@ var drift_label: Label
 var realism_label: Label
 var active_car_content_id: String = ""
 var active_track_content_id: String = ""
+var presentation_director: CoursePresentationDirector
+var presentation_adapter: CourseVisualAdapter
 
 var _camera: Camera3D
+var _world_environment: Environment
+var _key_light: DirectionalLight3D
+var _track_sparkles: GPUParticles3D
+var _presentation_materials: Array[StandardMaterial3D] = []
 var _track_root: Node3D
 var _spawn_transform := Transform3D.IDENTITY
 var _checkpoint_areas: Array[Area3D] = []
@@ -32,6 +38,7 @@ func _ready() -> void:
 	DefaultInputBindings.ensure_defaults()
 	_build_world()
 	_build_generated_track()
+	_build_presentation()
 	_build_vehicle()
 	_build_camera()
 	_build_hud()
@@ -96,6 +103,32 @@ func checkpoint_count() -> int:
 func current_lap() -> int:
 	return _lap
 
+func configure_presentation(cue_set: Dictionary) -> String:
+	if presentation_director == null:
+		return "presentation director is unavailable"
+	var error := presentation_director.configure(cue_set)
+	if not error.is_empty():
+		return error
+	_refresh_presentation_targets()
+	presentation_adapter.clear_transients()
+	presentation_director.emit_current_state()
+	return ""
+
+func advance_presentation_to(time_ms: int) -> Array[Dictionary]:
+	if presentation_director == null:
+		return []
+	return presentation_director.advance_to(time_ms)
+
+func seek_presentation_to(time_ms: int) -> String:
+	if presentation_director == null:
+		return "presentation director is unavailable"
+	var error := presentation_director.seek_to(time_ms)
+	if not error.is_empty():
+		return error
+	presentation_adapter.clear_transients()
+	presentation_director.emit_current_state()
+	return ""
+
 func mount_community_bundle(bundle: Dictionary) -> String:
 	for key in [
 		"car_content_id",
@@ -159,6 +192,9 @@ func mount_community_bundle(bundle: Dictionary) -> String:
 		_track_root.free()
 	_track_root = new_track_root
 	add_child(_track_root)
+	_track_sparkles = null
+	_presentation_materials.clear()
+	_refresh_presentation_targets()
 	_checkpoint_areas = new_areas
 	_spawn_transform = spawn_points[0]
 	_next_checkpoint = 0
@@ -228,6 +264,7 @@ func _build_world() -> void:
 	var environment_node := WorldEnvironment.new()
 	environment_node.name = "WorldEnvironment"
 	var environment := Environment.new()
+	_world_environment = environment
 	environment.background_mode = Environment.BG_COLOR
 	environment.background_color = Color(0.012, 0.006, 0.04)
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
@@ -239,6 +276,7 @@ func _build_world() -> void:
 	add_child(environment_node)
 
 	var sun := DirectionalLight3D.new()
+	_key_light = sun
 	sun.name = "KeyLight"
 	sun.rotation_degrees = Vector3(-52.0, -28.0, 0.0)
 	sun.light_energy = 1.35
@@ -247,6 +285,8 @@ func _build_world() -> void:
 
 
 func _build_generated_track() -> void:
+	_track_sparkles = null
+	_presentation_materials.clear()
 	_replace_track_root()
 	_build_fallback_floor()
 	_build_track_visuals()
@@ -254,6 +294,7 @@ func _build_generated_track() -> void:
 	var spawn_point := _ellipse_point(SPAWN_ANGLE, TRACK_RADIUS_X, TRACK_RADIUS_Z) + Vector3.UP * 0.78
 	var spawn_forward := _ellipse_tangent(SPAWN_ANGLE, TRACK_RADIUS_X, TRACK_RADIUS_Z)
 	_spawn_transform = Transform3D(Basis.looking_at(spawn_forward, Vector3.UP), spawn_point)
+	_refresh_presentation_targets()
 
 func _replace_track_root() -> void:
 	if _track_root != null and is_instance_valid(_track_root):
@@ -297,6 +338,7 @@ func _build_track_visuals() -> void:
 	road_material.emission = Color(0.08, 0.02, 0.22)
 	road_material.emission_energy_multiplier = 0.8
 	road_mesh.material = road_material
+	_presentation_materials.append(road_material)
 
 	var road_multimesh := MultiMesh.new()
 	road_multimesh.transform_format = MultiMesh.TRANSFORM_3D
@@ -319,6 +361,7 @@ func _build_track_visuals() -> void:
 	rail_material.emission_energy_multiplier = 2.6
 	rail_material.albedo_color = Color(0.9, 0.25, 1.0)
 	rail_mesh.material = rail_material
+	_presentation_materials.append(rail_material)
 
 	var rails := MultiMesh.new()
 	rails.transform_format = MultiMesh.TRANSFORM_3D
@@ -338,6 +381,7 @@ func _build_track_visuals() -> void:
 	_track_root.add_child(rail_instance)
 
 	var sparks := GPUParticles3D.new()
+	_track_sparkles = sparks
 	sparks.name = "TrackSparkles"
 	sparks.amount = 384
 	sparks.lifetime = 3.5
@@ -385,6 +429,26 @@ func _build_checkpoints() -> void:
 		area.body_entered.connect(_on_checkpoint_body_entered.bind(index))
 		_track_root.add_child(area)
 		_checkpoint_areas.append(area)
+
+func _build_presentation() -> void:
+	presentation_director = CoursePresentationDirector.new()
+	presentation_director.name = "CoursePresentationDirector"
+	add_child(presentation_director)
+	presentation_adapter = CourseVisualAdapter.new()
+	presentation_adapter.name = "CourseVisualAdapter"
+	add_child(presentation_adapter)
+	presentation_adapter.connect_director(presentation_director)
+	_refresh_presentation_targets()
+
+func _refresh_presentation_targets() -> void:
+	if presentation_adapter == null:
+		return
+	presentation_adapter.set_targets(
+		_world_environment,
+		_key_light,
+		_track_sparkles,
+		_presentation_materials
+	)
 
 func _build_vehicle(
 		profile: VehiclePerformanceProfile = null,
