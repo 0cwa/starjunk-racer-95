@@ -35,8 +35,9 @@ func import_track(package_root: String, manifest: Dictionary) -> Dictionary:
 		environment.free()
 		return _error("collision: %s" % str(collision_result.get("error", "import failed")))
 	var collision_scene: Node = collision_result["node"]
+	var surface_profile_id := StringName(str(manifest.get("surface_profile", RoadSurfaceRegistry.DEFAULT_ID)))
 
-	var built_collision := _build_collision(collision_scene)
+	var built_collision := _build_collision(collision_scene, surface_profile_id)
 	collision_scene.free()
 	if not bool(built_collision.get("ok", false)):
 		environment.free()
@@ -48,6 +49,7 @@ func import_track(package_root: String, manifest: Dictionary) -> Dictionary:
 		"collision": built_collision["node"],
 		"collision_mesh_count": built_collision["mesh_count"],
 		"collision_triangle_count": built_collision["triangle_count"],
+		"surface_profile": str(surface_profile_id),
 		"checkpoints": _copy_checkpoints(manifest["checkpoints"]),
 		"spawn_points": _make_spawn_transforms(manifest["spawn_points"]),
 		"manifest": manifest.duplicate(true),
@@ -127,11 +129,17 @@ func _is_forbidden_visual_node(node: Node) -> bool:
 		return true
 	return not (node is Node3D)
 
-func _build_collision(source_root: Node) -> Dictionary:
+func _build_collision(source_root: Node, surface_profile_id: StringName) -> Dictionary:
 	var collision_root := Node3D.new()
 	collision_root.name = "CommunityTrackCollision"
 	var stats := {"meshes": 0, "triangles": 0}
-	var error := _collect_collision_meshes(source_root, Transform3D.IDENTITY, collision_root, stats)
+	var error := _collect_collision_meshes(
+		source_root,
+		Transform3D.IDENTITY,
+		collision_root,
+		stats,
+		surface_profile_id
+	)
 	if not error.is_empty():
 		collision_root.free()
 		return _error("collision: %s" % error)
@@ -145,7 +153,13 @@ func _build_collision(source_root: Node) -> Dictionary:
 		"triangle_count": stats["triangles"],
 	}
 
-func _collect_collision_meshes(node: Node, parent_transform: Transform3D, output: Node3D, stats: Dictionary) -> String:
+func _collect_collision_meshes(
+		node: Node,
+		parent_transform: Transform3D,
+		output: Node3D,
+		stats: Dictionary,
+		surface_profile_id: StringName
+) -> String:
 	var current_transform := parent_transform
 	if node is Node3D:
 		current_transform = parent_transform * node.transform
@@ -167,6 +181,7 @@ func _collect_collision_meshes(node: Node, parent_transform: Transform3D, output
 			return "unable to create trimesh collision shape"
 		var body := StaticBody3D.new()
 		body.name = "TrackCollisionMesh%d" % int(stats["meshes"])
+		body.set_meta(RoadSurfaceRegistry.METADATA_KEY, str(surface_profile_id))
 		body.transform = current_transform
 		var collision_shape := CollisionShape3D.new()
 		collision_shape.shape = shape
@@ -174,7 +189,13 @@ func _collect_collision_meshes(node: Node, parent_transform: Transform3D, output
 		output.add_child(body)
 
 	for child in node.get_children():
-		var error := _collect_collision_meshes(child, current_transform, output, stats)
+		var error := _collect_collision_meshes(
+			child,
+			current_transform,
+			output,
+			stats,
+			surface_profile_id
+		)
 		if not error.is_empty():
 			return error
 	return ""

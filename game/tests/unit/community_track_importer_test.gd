@@ -17,6 +17,7 @@ func _ready() -> void:
 		"name": "Community Prism Loop",
 		"environment": "environment.glb",
 		"collision": "collision.glb",
+		"surface_profile": "wet",
 		"checkpoints": [
 			{"id": "start", "position": [0.0, 1.0, 0.0], "size": [4.0, 2.0, 1.0]},
 			{"id": "cp-1", "position": [0.0, 1.0, -20.0], "size": [4.0, 2.0, 1.0]},
@@ -36,6 +37,8 @@ func _ready() -> void:
 		_check(_count_collision_shapes(collision) >= 1, "track collision should be game-owned collision shapes")
 		_check(int(result["collision_mesh_count"]) >= 1, "collision mesh count should be reported")
 		_check(int(result["collision_triangle_count"]) > 0, "collision triangle count should be reported")
+		_check(str(result["surface_profile"]) == "wet", "trusted surface selection should be reported")
+		_check(_all_collision_bodies_use_surface(collision, "wet"), "game-owned collision bodies should carry trusted surface metadata")
 		_check(result["checkpoints"].size() == 2, "validated checkpoints should be returned")
 		var spawns: Array[Transform3D] = result["spawn_points"]
 		_check(spawns.size() == 1, "spawn transforms should be returned")
@@ -101,6 +104,15 @@ func _count_collision_shapes(node: Node) -> int:
 	for child in node.get_children():
 		count += _count_collision_shapes(child)
 	return count
+
+func _all_collision_bodies_use_surface(node: Node, expected: String) -> bool:
+	if node is StaticBody3D:
+		if str(node.get_meta(RoadSurfaceRegistry.METADATA_KEY, "")) != expected:
+			return false
+	for child in node.get_children():
+		if not _all_collision_bodies_use_surface(child, expected):
+			return false
+	return true
 
 func _cleanup() -> void:
 	for path in [ENV_PATH, COLLISION_PATH]:

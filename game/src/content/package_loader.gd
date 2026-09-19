@@ -83,6 +83,11 @@ func _validate_track(manifest: Dictionary) -> Dictionary:
 		if not cue_error.is_empty():
 			return _error(cue_error)
 
+	if manifest.has("surface_profile"):
+		var surface_id := StringName(str(manifest["surface_profile"]))
+		if not RoadSurfaceRegistry.has_profile(surface_id):
+			return _error("Unknown surface_profile: %s" % surface_id)
+
 	if not manifest["checkpoints"] is Array or manifest["checkpoints"].size() < 2:
 		return _error("Track requires at least two checkpoints")
 	if manifest["checkpoints"].size() > 256:

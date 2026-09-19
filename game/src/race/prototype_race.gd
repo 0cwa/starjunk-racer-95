@@ -306,6 +306,7 @@ func _replace_track_root() -> void:
 func _build_fallback_floor() -> void:
 	var floor := StaticBody3D.new()
 	floor.name = "Floor"
+	floor.set_meta(RoadSurfaceRegistry.METADATA_KEY, str(RoadSurfaceRegistry.DEFAULT_ID))
 	floor.position = Vector3(0.0, -0.5, 0.0)
 	var collision := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
