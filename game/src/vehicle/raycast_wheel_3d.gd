@@ -58,6 +58,9 @@ func sample_and_apply(
 		return last_sample
 
 	var contact_point := get_collision_point()
+	var surface_profile_id := RoadSurfaceRegistry.profile_id_for_collider(get_collider())
+	var surface_profile := RoadSurfaceRegistry.resolve(surface_profile_id)
+	var surface_grip_multiplier := float(surface_profile["grip_multiplier"])
 	var surface_normal := get_collision_normal().normalized()
 	var contact_distance := maxf(global_position.distance_to(contact_point) - wheel_radius, 0.0)
 	var compression := SuspensionModel.compression_m(
@@ -106,6 +109,8 @@ func sample_and_apply(
 			"grounded": true,
 			"driven": driven,
 			"normal_force_n": normal_force,
+			"surface_profile_id": str(surface_profile_id),
+			"surface_grip_multiplier": surface_grip_multiplier,
 			"wheel_angular_speed_rad_s": wheel_angular_speed_rad_s,
 			"longitudinal_slip_ratio": 0.0,
 		}
@@ -127,20 +132,21 @@ func sample_and_apply(
 		TireForceModel.DEFAULT_SLIDE_GRIP_RATIO,
 		float(handling["grip_recovery_assist"])
 	)
+	var surface_grip := float(handling["base_grip_coefficient"]) * surface_grip_multiplier
 	var lateral_force := TireForceModel.lateral_force_n(
 		slip_angle,
 		normal_force,
-		float(handling["base_grip_coefficient"]),
-		float(handling["cornering_stiffness"]),
-		float(handling["peak_slip_angle_deg"]),
+		surface_grip,
+		float(handling["cornering_stiffness"]) * float(surface_profile["lateral_stiffness_multiplier"]),
+		float(handling["peak_slip_angle_deg"]) * float(surface_profile["peak_slip_angle_multiplier"]),
 		slide_grip_ratio
 	)
 	var longitudinal_force := TireForceModel.longitudinal_force_n(
 		longitudinal_slip_ratio,
 		normal_force,
-		float(handling["base_grip_coefficient"]) * float(handling["longitudinal_grip_bias"]),
-		float(handling["base_longitudinal_stiffness_n_per_slip"]),
-		float(handling["base_peak_longitudinal_slip_ratio"]),
+		surface_grip * float(handling["longitudinal_grip_bias"]),
+		float(handling["base_longitudinal_stiffness_n_per_slip"]) * float(surface_profile["longitudinal_stiffness_multiplier"]),
+		float(handling["base_peak_longitudinal_slip_ratio"]) * float(surface_profile["peak_longitudinal_slip_multiplier"]),
 		slide_grip_ratio
 	)
 
@@ -148,7 +154,7 @@ func sample_and_apply(
 		longitudinal_force,
 		lateral_force,
 		normal_force,
-		float(handling["base_grip_coefficient"]),
+		surface_grip,
 		float(handling["longitudinal_grip_bias"])
 	)
 
@@ -175,6 +181,8 @@ func sample_and_apply(
 		"contact_point": contact_point,
 		"compression_m": compression,
 		"normal_force_n": normal_force,
+		"surface_profile_id": str(surface_profile_id),
+		"surface_grip_multiplier": surface_grip_multiplier,
 		"longitudinal_speed_mps": longitudinal_speed,
 		"lateral_speed_mps": lateral_speed,
 		"slip_angle_rad": slip_angle,

@@ -12,6 +12,7 @@ The `starjunk95/*/1` formats are deliberately engine-independent public contract
 - Car packages select a game-owned `performance_profile`; they cannot ship competitive physics.
 - Imported car models are visual-only; collision/physics authority remains game-owned.
 - Track packages declare geometry and race structure, not arbitrary GDScript.
+- Track packages may select a trusted game-owned `surface_profile` (`asphalt`, `wet`, or `gravel`); they cannot define friction coefficients.
 - Imported packages should be treated as untrusted input before any files are opened or instantiated.
 
 The JSON schemas define portable structure. The Godot-side loader adds runtime policy checks that schemas alone cannot express, such as whether a requested performance profile is trusted by this game version.

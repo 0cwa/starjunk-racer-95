@@ -40,6 +40,7 @@ func _ready() -> void:
 		"name": "Prism Loop",
 		"environment": "world/environment.glb",
 		"collision": "world/collision.glb",
+		"surface_profile": "wet",
 		"checkpoints": [
 			{"id": "start", "position": [0.0, 1.0, 0.0], "size": [4.0, 2.0, 1.0]},
 			{"id": "cp-1", "position": [0.0, 1.0, -20.0], "size": [4.0, 2.0, 1.0]},
@@ -49,6 +50,10 @@ func _ready() -> void:
 		],
 	}
 	_check(bool(loader.validate_manifest(valid_track).get("ok", false)), "valid track manifest should pass")
+
+	var unknown_surface := valid_track.duplicate(true)
+	unknown_surface["surface_profile"] = "moon_dust_supergrip"
+	_check(not bool(loader.validate_manifest(unknown_surface).get("ok", true)), "community track cannot invent a surface physics profile")
 
 	var script_track := valid_track.duplicate(true)
 	script_track["environment"] = "world/track.gd"

@@ -35,6 +35,8 @@ jobs:
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/handling_assist_model_test.tscn'
       - name: Run tire force model tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/tire_force_model_test.tscn'
+      - name: Run trusted road surface registry tests
+        run: '"$GODOT_BIN" --headless --path game res://tests/unit/road_surface_registry_test.tscn'
       - name: Run longitudinal tire force tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/longitudinal_tire_force_test.tscn'
       - name: Run wheel slip kinematics tests
@@ -45,6 +47,8 @@ jobs:
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/suspension_model_test.tscn'
       - name: Run raycast vehicle integration test
         run: '"$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/raycast_vehicle_test.tscn'
+      - name: Run road surface vehicle integration test
+        run: 'timeout 45s "$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/road_surface_vehicle_test.tscn'
       - name: Run playable prototype race integration test
         run: 'timeout 45s "$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/prototype_race_test.tscn'
       - name: Run vehicle telemetry accumulator tests

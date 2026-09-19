@@ -99,6 +99,13 @@
           ]
         }
       }
+    },
+    "surface_profile": {
+      "enum": [
+        "asphalt",
+        "wet",
+        "gravel"
+      ]
     }
   },
   "$defs": {

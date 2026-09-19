@@ -106,3 +106,18 @@ The rotational integrator clamps tyre-reaction movement at the instantaneous rol
 
 
 The current prototype's drive-force ceiling is tuned so the characterization harness at 65% throttle operates near, but below, static rear-axle peak traction. Full throttle still exceeds static rear grip and can produce deliberate wheelspin. This is provisional until longitudinal load transfer is modeled.
+
+
+## Trusted road surfaces
+
+Road surface behavior is a third axis, separate from both car identity and the race-wide realism setting. `RoadSurfaceRegistry` owns the coefficients for generation-1 surfaces:
+
+- `asphalt` — baseline tyre response;
+- `wet` — lower peak grip/stiffness with a slightly wider slip envelope;
+- `gravel` — substantially lower/stiffer-response grip with a much wider usable slip envelope.
+
+A track package may select only a trusted `surface_profile` ID. It cannot supply friction coefficients, tyre curves, scripts, or arbitrary physics resources. Imported collision bodies are rebuilt by the game and tagged with that trusted ID.
+
+Each raycast wheel resolves the collider's trusted surface metadata at contact time and applies the registry multipliers to the existing lateral/longitudinal tyre curves and friction ellipse. Missing or invalid metadata falls back to `asphalt`. Surface ID and grip multiplier are included in wheel telemetry.
+
+The realism slider still changes only assistance/recovery behavior. It does not change which road surface is under the tyre or the surface's peak-friction multiplier.
