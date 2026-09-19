@@ -20,6 +20,11 @@ var _timeline := SongCueTimeline.new()
 var _cue_set: Dictionary = {}
 var _persistent_state: Dictionary = {}
 
+func clear() -> void:
+	_timeline = SongCueTimeline.new()
+	_cue_set.clear()
+	_reset_persistent_state()
+
 func configure(cue_set: Dictionary) -> String:
 	var error := _timeline.configure(cue_set)
 	if not error.is_empty():

@@ -3,6 +3,7 @@ extends RefCounted
 
 const MAX_ENVIRONMENT_GLB_BYTES := 256 * 1024 * 1024
 const MAX_COLLISION_GLB_BYTES := 64 * 1024 * 1024
+const MAX_CUE_SET_BYTES := 2 * 1024 * 1024
 const MAX_VISUAL_NODES := 5000
 const MAX_VISUAL_LIGHTS := 64
 const MAX_COLLISION_MESHES := 256
@@ -16,6 +17,13 @@ func import_track(package_root: String, manifest: Dictionary) -> Dictionary:
 		return _error(str(validation.get("error", "invalid manifest")))
 	if str(manifest.get("format", "")) != StarjunkPackageLoader.TRACK_FORMAT:
 		return _error("manifest is not a track package")
+
+	var song_cue_set: Dictionary = {}
+	if manifest.has("song_cue_set"):
+		var cue_result := _load_song_cue_set(package_root, manifest["song_cue_set"])
+		if not bool(cue_result.get("ok", false)):
+			return _error("song cue set: %s" % str(cue_result.get("error", "invalid cue set")))
+		song_cue_set = cue_result["cue_set"]
 
 	var environment_result := _load_embedded_glb(package_root, manifest["environment"], MAX_ENVIRONMENT_GLB_BYTES)
 	if not bool(environment_result.get("ok", false)):
@@ -50,10 +58,33 @@ func import_track(package_root: String, manifest: Dictionary) -> Dictionary:
 		"collision_mesh_count": built_collision["mesh_count"],
 		"collision_triangle_count": built_collision["triangle_count"],
 		"surface_profile": str(surface_profile_id),
+		"song_cue_set": song_cue_set.duplicate(true),
 		"checkpoints": _copy_checkpoints(manifest["checkpoints"]),
 		"spawn_points": _make_spawn_transforms(manifest["spawn_points"]),
 		"manifest": manifest.duplicate(true),
 	}
+
+func _load_song_cue_set(package_root: String, relative_path: Variant) -> Dictionary:
+	var resolved := _package_loader.resolve_package_asset_path(package_root, relative_path)
+	if not bool(resolved.get("ok", false)):
+		return _error(str(resolved.get("error", "invalid cue-set path")))
+	var path := str(resolved["path"])
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return _error("unable to open cue set: %s" % path)
+	var byte_count := file.get_length()
+	if byte_count <= 0:
+		return _error("cue set is empty")
+	if byte_count > MAX_CUE_SET_BYTES:
+		return _error("cue set exceeds %d bytes" % MAX_CUE_SET_BYTES)
+	var parsed = JSON.parse_string(file.get_as_text())
+	if not parsed is Dictionary:
+		return _error("cue set root must be an object")
+	var cue_set: Dictionary = parsed
+	var cue_error := SongCueTimeline.validate(cue_set)
+	if not cue_error.is_empty():
+		return _error(cue_error)
+	return {"ok": true, "cue_set": cue_set.duplicate(true)}
 
 func _load_embedded_glb(package_root: String, relative_path: Variant, max_bytes: int) -> Dictionary:
 	var resolved := _package_loader.resolve_package_asset_path(package_root, relative_path)
