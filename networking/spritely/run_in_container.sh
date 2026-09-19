@@ -4,7 +4,7 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
-apt-get install -y --no-install-recommends   ca-certificates   guile-3.0   guile-goblins   guile-hoot   guile-gnutls   guile-websocket   nodejs
+apt-get install -y --no-install-recommends   ca-certificates   chromium   guile-3.0   guile-goblins   guile-hoot   guile-gnutls   guile-websocket   nodejs
 
 GOBLINS_VERSION="$(dpkg-query -W -f='${Version}' guile-goblins)"
 HOOT_VERSION="$(dpkg-query -W -f='${Version}' guile-hoot)"
@@ -55,5 +55,28 @@ NODE
 test -s build/spritely/starjunk-spritely-room.imports.json
 node networking/spritely/tests/browser-host-contract.mjs   build/spritely/starjunk-spritely-room.imports.json
 
+# Use the runtime assets shipped by the exact Hoot package under test.  Do not
+# vendor a second copy that can drift independently from the compiler/runtime.
+HOOT_REFLECT_JS="$(dpkg -L guile-hoot | awk '/\/reflect-js\/reflect\.js$/ { print; exit }')"
+HOOT_REFLECT_WASM="$(dpkg -L guile-hoot | awk '/\/reflect-wasm\/reflect\.wasm$/ { print; exit }')"
+HOOT_WTF8_WASM="$(dpkg -L guile-hoot | awk '/\/reflect-wasm\/wtf8\.wasm$/ { print; exit }')"
+for asset in "$HOOT_REFLECT_JS" "$HOOT_REFLECT_WASM" "$HOOT_WTF8_WASM"; do
+  test -n "$asset"
+  test -s "$asset"
+done
+
+BROWSER_ROOT=build/spritely/browser
+rm -rf "$BROWSER_ROOT"
+mkdir -p "$BROWSER_ROOT"
+cp "$HOOT_REFLECT_JS" "$BROWSER_ROOT/reflect.js"
+cp "$HOOT_REFLECT_WASM" "$BROWSER_ROOT/reflect.wasm"
+cp "$HOOT_WTF8_WASM" "$BROWSER_ROOT/wtf8.wasm"
+cp build/spritely/starjunk-spritely-room.wasm "$BROWSER_ROOT/"
+cp networking/spritely/browser-host.mjs "$BROWSER_ROOT/"
+cp networking/spritely/tests/browser-smoke.html "$BROWSER_ROOT/"
+cp networking/spritely/tests/browser-smoke.mjs "$BROWSER_ROOT/"
+
+node networking/spritely/tests/run-browser-smoke.mjs "$BROWSER_ROOT" chromium
+
 cat build/spritely/starjunk-spritely-room.imports.json
-printf 'Spritely native + browser compile/host probes passed\n'
+printf 'Spritely native + browser host + real-browser probes passed\n'
