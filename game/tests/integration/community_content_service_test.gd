@@ -32,7 +32,7 @@ func _ready() -> void:
 	_check(car_id.begins_with("sha256:"), "car install should return immutable content id")
 	_check(track_id.begins_with("sha256:"), "track install should return immutable content id")
 	_check(car_id != track_id, "car and track should have different content identities")
-	_check(not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(STAGING)), "service should remove transient staging tree")
+	_check(_directory_empty(STAGING), "service should leave no transient staged package data")
 
 	var duplicate := service.install_zip(CAR_ZIP)
 	_check(bool(duplicate.get("ok", false)), "duplicate ZIP install should succeed")
@@ -202,6 +202,21 @@ func _make_dir(path: String) -> bool:
 func _physics_frames(count: int) -> void:
 	for _index in range(count):
 		await get_tree().physics_frame
+
+func _directory_empty(path: String) -> bool:
+	var directory := DirAccess.open(path)
+	if directory == null:
+		return true
+	directory.list_dir_begin()
+	while true:
+		var name := directory.get_next()
+		if name.is_empty():
+			break
+		if name != "." and name != "..":
+			directory.list_dir_end()
+			return false
+	directory.list_dir_end()
+	return true
 
 func _cleanup() -> void:
 	_remove_tree(ProjectSettings.globalize_path(ROOT))
