@@ -7,7 +7,7 @@ This directory contains versioned probes that turn the networking architecture i
 CI proves four things against the pinned Goblins 0.18 / Hoot 0.9 package families:
 
 1. **Native TCP+TLS CapTP:** a host registers a room, a second node enlivens its sturdyref, receives a racer facet, and calls that facet remotely.
-2. **Native WebSocket CapTP:** two separate Goblins vats use actual WebSocket netlayers; the client enlivens a remote room and receives/calls a returned racer capability.
+2. **Native WebSocket CapTP:** two separate Goblins vats use actual WebSocket netlayers; the client enlivens a remote room, receives a racer capability, and proves positive readiness while binding canonical car/track SHA-256 IDs.
 3. **Hoot browser compilation:** the CapTP/WebSocket dependency graph and Starjunk room actor compile into browser-targeted Wasm.
 4. **Browser host contract capture:** CI records `WebAssembly.Module.imports()` for that Wasm and asserts the expected Goblins crypto host import family is present.
 

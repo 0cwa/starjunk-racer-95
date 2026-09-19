@@ -1,6 +1,7 @@
 extends Node
 
 const TEST_CONTENT_ID := "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+const TEST_TRACK_ID := "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
 
 var _failures := PackedStringArray()
 
@@ -53,13 +54,23 @@ func _test_snapshot() -> void:
 	_check(not RaceProtocol.validate_snapshot(bad_brake).is_empty(), "controls must be bounded")
 
 func _test_control_events() -> void:
-	var ready := RaceProtocol.make_event(
-		RaceProtocol.EVENT_RACER_READY,
+	var ready := RaceProtocol.make_racer_ready_event(
 		1,
+		"racer-95",
+		true,
+		TEST_CONTENT_ID,
+		TEST_TRACK_ID
+	)
+	_check(RaceProtocol.validate_event(ready).is_empty(), "ready event with exact car/track identities should pass")
+	var unready := RaceProtocol.make_racer_ready_event(2, "racer-95", false)
+	_check(RaceProtocol.validate_event(unready).is_empty(), "unready event should not require content identities")
+	var unbound_ready := RaceProtocol.make_event(
+		RaceProtocol.EVENT_RACER_READY,
+		3,
 		"racer-95",
 		{"ready": true}
 	)
-	_check(RaceProtocol.validate_event(ready).is_empty(), "ready event should pass")
+	_check(not RaceProtocol.validate_event(unbound_ready).is_empty(), "positive readiness must bind exact car and track identities")
 	var checkpoint := RaceProtocol.make_event(
 		RaceProtocol.EVENT_CHECKPOINT,
 		2,

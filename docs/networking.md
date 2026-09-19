@@ -6,7 +6,7 @@ Godot talks only to `MultiplayerAdapter` game concepts and validated `RaceProtoc
 
 ## Protocol split
 
-- `starjunk95/race-control/2` — low-frequency room/racer lifecycle, checkpoint/lap/finish events, content references and realtime-lane authorization. Track and shared-content capabilities are bound to canonical `sha256:` content IDs so authority and immutable byte identity are separate.
+- `starjunk95/race-control/3` — low-frequency room/racer lifecycle, checkpoint/lap/finish events, content references and realtime-lane authorization. Track and shared-content capabilities are bound to canonical `sha256:` content IDs so authority and immutable byte identity are separate.
 - `starjunk95/race-state/1` — compact sequenced car state/control snapshots for prediction and interpolation.
 
 The split lets us use Spritely where object capabilities are most valuable without coupling rendering/physics tick rate to CapTP latency or protocol overhead.
@@ -29,8 +29,14 @@ See `networking/spritely-bridge.md` for capability facets and bridge boundaries.
 Network-version upgrades are explicit compatibility work, not dependency bumps.
 
 
-## Control protocol v2 content binding
+## Control protocol v3 readiness binding
 
-Version 2 is an intentional pre-release breaking change from `race-control/1`. A race room now carries both `track_reference` (the OCapN capability granting authority/access) and `track_content_id` (the immutable SHA-256 package identity). Content-reference events similarly require both fields.
+Version 3 keeps the v2 separation between capability authority and immutable content identity, and extends it to positive racer readiness.
+
+A race room carries both `track_reference` (the OCapN capability granting authority/access) and `track_content_id` (the immutable SHA-256 package identity). Car/track content-reference events likewise pair an OCapN reference with a canonical content ID.
+
+`racer_ready { ready: true }` now also requires the exact `car_content_id` and `track_content_id`. `RaceContentAgreement` will only manufacture that event after the local `CommunityContentService` re-verifies that the room track ID resolves to an installed track package and the advertised car ID resolves to an installed car package. A peer can become unready without IDs.
+
+The Spritely racer facet mirrors this contract: its remote `ready` call accepts the boolean plus both canonical IDs. This does not grant new authority; it proves which immutable bytes the racer says it is ready to use.
 
 The realtime snapshot protocol remains `starjunk95/race-state/1`; its wire semantics did not change.

@@ -57,6 +57,8 @@
 
 (define done? (make-condition))
 (define failure #f)
+(define car-content-id "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+(define track-content-id "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789")
 
 (define remote-room
   (with-vat client-vat
@@ -77,7 +79,7 @@
                   (lambda (racer-id)
                     (unless (string=? racer-id "client-racer-95")
                       (set! failure "remote racer facet returned wrong id"))
-                    (on (<- racer 'ready #t)
+                    (on (<- racer 'ready #t car-content-id track-content-id)
                         (lambda (ready?)
                           (unless ready?
                             (set! failure "remote racer ready call failed"))
