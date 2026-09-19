@@ -20,6 +20,11 @@ var _timeline := SongCueTimeline.new()
 var _cue_set: Dictionary = {}
 var _persistent_state: Dictionary = {}
 
+func clear() -> void:
+	_timeline = SongCueTimeline.new()
+	_cue_set.clear()
+	_reset_persistent_state()
+
 func configure(cue_set: Dictionary) -> String:
 	var error := _timeline.configure(cue_set)
 	if not error.is_empty():
@@ -64,7 +69,10 @@ func snapshot_state() -> Dictionary:
 
 func emit_current_state() -> void:
 	for kind in PERSISTENT_KINDS:
-		var payload: Dictionary = _persistent_state[kind]
+		var payload_value = _persistent_state.get(kind, {})
+		if not payload_value is Dictionary:
+			continue
+		var payload: Dictionary = payload_value
 		if not payload.is_empty():
 			_emit_kind(kind, payload.duplicate(true))
 

@@ -46,6 +46,8 @@ func import_bundle(car_package_root: String, track_package_root: String) -> Dict
 		"track_collision": track_result["collision"],
 		"track_collision_mesh_count": track_result["collision_mesh_count"],
 		"track_collision_triangle_count": track_result["collision_triangle_count"],
+		"track_surface_profile": str(track_result["surface_profile"]),
+		"song_cue_set": track_result["song_cue_set"].duplicate(true),
 		"checkpoints": track_result["checkpoints"].duplicate(true),
 		"spawn_points": track_result["spawn_points"].duplicate(),
 	}
