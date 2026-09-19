@@ -40,3 +40,12 @@ A race room carries both `track_reference` (the OCapN capability granting author
 The Spritely racer facet mirrors this contract: its remote `ready` call accepts the boolean plus both canonical IDs. This does not grant new authority; it proves which immutable bytes the racer says it is ready to use.
 
 The realtime snapshot protocol remains `starjunk95/race-state/1`; its wire semantics did not change.
+
+
+## Content-reader capabilities
+
+Community package bytes are not embedded directly in race events. A race/content reference binds an immutable package content ID to an OCapN capability. That capability can resolve to a read-only content object whose descriptor identifies files/hashes and whose `open-blob` method returns a narrower blob-reader facet.
+
+Blob reads are ranged and capped at 64 KiB. This keeps CapTP messages bounded and means a peer can stream, hash, and stage a large GLB/package incrementally without receiving publisher authority.
+
+Publish/update/fork authority will be modeled as separate capabilities rather than methods on the reader facet.
