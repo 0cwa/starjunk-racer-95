@@ -23,3 +23,21 @@ This keeps song timing declarative and portable. A WebGPU/native renderer differ
 ## Safety
 
 Cue sets cannot introduce new signal kinds at runtime. Unknown kinds fail validation in `SongCueTimeline`. The director has no authority to change vehicle forces, checkpoints, lap state, filesystem state, or networking capabilities.
+
+
+## Godot visual adapter
+
+`CourseVisualAdapter` is the narrow Godot renderer adapter used by the playable scene. It receives only explicit game-owned render references: the course `Environment`, one key light, an optional GPU-particle emitter, and an allowlisted array of scenery materials.
+
+Generation-1 payload fields have deliberately small authority:
+
+- **palette:** `background_color`, `ambient_color`, `ambient_energy`;
+- **lighting:** `energy`, `color`;
+- **particles:** `intensity` and optional `restart`;
+- **scenery:** `emission_energy` on the allowlisted presentation materials;
+- **post_process:** `glow_intensity`;
+- **beat:** bounded temporary key-light pulse via `strength` and `duration_ms`.
+
+All numeric inputs are clamped. Cue data never names a node, material, property path, collision object, or vehicle. Community track visuals therefore cannot use presentation cues to move collision or alter race state.
+
+`PrototypeRace.configure_presentation()`, `advance_presentation_to()`, and `seek_presentation_to()` expose the timing seam while keeping audio-clock ownership separate. Seeking clears transient pulses and reapplies reconstructed persistent state.
