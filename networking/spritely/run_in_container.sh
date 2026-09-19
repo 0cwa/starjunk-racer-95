@@ -73,10 +73,11 @@ cp "$HOOT_REFLECT_WASM" "$BROWSER_ROOT/reflect.wasm"
 cp "$HOOT_WTF8_WASM" "$BROWSER_ROOT/wtf8.wasm"
 cp build/spritely/starjunk-spritely-room.wasm "$BROWSER_ROOT/"
 cp networking/spritely/browser-host.mjs "$BROWSER_ROOT/"
+cp networking/spritely/browser-race-bridge.mjs "$BROWSER_ROOT/"
 cp networking/spritely/tests/browser-smoke.html "$BROWSER_ROOT/"
 cp networking/spritely/tests/browser-smoke.mjs "$BROWSER_ROOT/"
 
 node networking/spritely/tests/run-browser-smoke.mjs "$BROWSER_ROOT" chromium
 
 cat build/spritely/starjunk-spritely-room.imports.json
-printf 'Spritely native + browser host + real-browser probes passed\n'
+printf 'Spritely native + browser race bridge probes passed\n'
