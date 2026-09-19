@@ -70,6 +70,22 @@ func catalog() -> Dictionary:
 		"corrupt": corrupt,
 	}
 
+func verify_content(content_id: String, expected_format: String = "") -> Dictionary:
+	var resolved := _library.resolve(content_id)
+	if not bool(resolved.get("ok", false)):
+		return _error(str(resolved.get("error", "unable to resolve content")))
+	var package_format := str(resolved.get("package_format", ""))
+	if not expected_format.is_empty() and package_format != expected_format:
+		return _error("content id does not identify expected package format")
+	var manifest: Dictionary = resolved["manifest"]
+	return {
+		"ok": true,
+		"content_id": str(resolved["content_id"]),
+		"package_format": package_format,
+		"name": str(manifest.get("name", "")),
+		"manifest": manifest.duplicate(true),
+	}
+
 func build_race_bundle(car_content_id: String, track_content_id: String) -> Dictionary:
 	var car := _library.resolve(car_content_id)
 	if not bool(car.get("ok", false)):

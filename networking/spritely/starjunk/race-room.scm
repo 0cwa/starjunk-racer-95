@@ -3,13 +3,29 @@
   #:use-module (goblins actor-lib methods)
   #:export (^race-room ^racer-facet race-control-protocol))
 
-(define race-control-protocol "starjunk95/race-control/2")
+(define race-control-protocol "starjunk95/race-control/3")
+
+(define (canonical-sha256-content-id? value)
+  (and (string? value)
+       (= (string-length value) 71)
+       (string-prefix? "sha256:" value)
+       (let loop ((index 7))
+         (if (= index (string-length value))
+             #t
+             (let ((ch (string-ref value index)))
+               (and (or (char-numeric? ch)
+                        (and (char>=? ch #\a)
+                             (char<=? ch #\f)))
+                    (loop (+ index 1))))))))
 
 (define-actor (^racer-facet _bcom racer-id)
   (methods
    [(id) racer-id]
-   [(ready value)
-    (and (boolean? value) value)]))
+   [(ready value car-content-id track-content-id)
+    (and (boolean? value)
+         value
+         (canonical-sha256-content-id? car-content-id)
+         (canonical-sha256-content-id? track-content-id))]))
 
 (define-actor (^race-room _bcom)
   (methods

@@ -1,7 +1,7 @@
 class_name RaceProtocol
 extends RefCounted
 
-const CONTROL_PROTOCOL := "starjunk95/race-control/2"
+const CONTROL_PROTOCOL := "starjunk95/race-control/3"
 const REALTIME_PROTOCOL := "starjunk95/race-state/1"
 const MAX_RACER_ID_BYTES := 96
 const MAX_CAPABILITY_REFERENCE_BYTES := 4096
@@ -111,6 +111,19 @@ static func validate_snapshot(snapshot: Dictionary) -> String:
 		return "brake must be within 0..1"
 	return ""
 
+static func make_racer_ready_event(
+		sequence: int,
+		racer_id: String,
+		ready: bool,
+		car_content_id: String = "",
+		track_content_id: String = ""
+) -> Dictionary:
+	var data := {"ready": ready}
+	if ready:
+		data["car_content_id"] = car_content_id
+		data["track_content_id"] = track_content_id
+	return make_event(EVENT_RACER_READY, sequence, racer_id, data)
+
 static func make_event(event_type: String, sequence: int, racer_id: String, data: Dictionary = {}) -> Dictionary:
 	return {
 		"protocol": CONTROL_PROTOCOL,
@@ -141,6 +154,13 @@ static func validate_event(event: Dictionary) -> String:
 		EVENT_RACER_READY:
 			if not data.get("ready") is bool:
 				return "racer_ready requires boolean ready"
+			if bool(data["ready"]):
+				var car_id_error := _validate_content_id("car_content_id", data.get("car_content_id"))
+				if not car_id_error.is_empty():
+					return car_id_error
+				var track_id_error := _validate_content_id("track_content_id", data.get("track_content_id"))
+				if not track_id_error.is_empty():
+					return track_id_error
 		EVENT_CHECKPOINT:
 			var checkpoint_error := _validate_identifier("checkpoint_id", data.get("checkpoint_id"))
 			if not checkpoint_error.is_empty():
