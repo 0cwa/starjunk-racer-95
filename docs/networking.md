@@ -37,6 +37,6 @@ A race room carries both `track_reference` (the OCapN capability granting author
 
 `racer_ready { ready: true }` now also requires the exact `car_content_id` and `track_content_id`. `RaceContentAgreement` will only manufacture that event after the local `CommunityContentService` re-verifies that the room track ID resolves to an installed track package and the advertised car ID resolves to an installed car package. A peer can become unready without IDs.
 
-The Spritely racer facet mirrors this contract: its remote `ready` call accepts the boolean plus both canonical IDs. This does not grant new authority; it proves which immutable bytes the racer says it is ready to use.
+The Spritely racer facet mirrors the wire contract with narrow capability methods: positive readiness uses `ready` plus both canonical IDs, while `racer_ready { ready: false }` maps to `unready` and carries no content IDs. This does not grant new authority; positive readiness proves which immutable bytes the racer says it is ready to use.
 
 The realtime snapshot protocol remains `starjunk95/race-state/1`; its wire semantics did not change.
