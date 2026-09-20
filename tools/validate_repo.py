@@ -10,6 +10,16 @@ REQUIRED = [
     "AGENTS.md",
     "docs/README.md",
     "engine/source-lock.json",
+    "tools/engine/apply_starjunk_port_patches.py",
+    "tools/engine/prepare_port_candidate.sh",
+    "tools/engine/build_webgpu_rust_deps.sh",
+    "tools/engine/forward_port_probe.sh",
+    "tools/engine/export_webgpu_benchmark.sh",
+    "tools/perf/webgpu_browser_smoke.py",
+    "game/tests/perf/webgpu_boot/webgpu_boot.gd",
+    "game/tests/perf/webgpu_boot/webgpu_boot.tscn",
+    ".github/workflows/webgpu-candidate-build.yml",
+    ".github/workflows/webgpu-forward-port-probe.yml",
     "networking/source-lock.json",
     "networking/spritely/web/bootstrap.mjs",
     "tools/networking/package_spritely_web.sh",
@@ -55,6 +65,13 @@ def main() -> None:
         commit = lock[key]["commit"]
         if len(commit) != 40 or any(c not in "0123456789abcdef" for c in commit):
             raise SystemExit(f"{key} is not pinned to a full SHA")
+
+    for key in ("naga_native", "spirv_webgpu_transform"):
+        commit = lock["webgpu_rust_dependencies"][key]["commit"]
+        if len(commit) != 40 or any(c not in "0123456789abcdef" for c in commit):
+            raise SystemExit(f"webgpu_rust_dependencies.{key} is not pinned to a full SHA")
+    if lock.get("emscripten") != "6.0.9":
+        raise SystemExit("WebGPU candidate Emscripten must remain pinned to 6.0.9")
 
     network_lock = json.loads(
         (ROOT / "networking/source-lock.json").read_text(encoding="utf-8")

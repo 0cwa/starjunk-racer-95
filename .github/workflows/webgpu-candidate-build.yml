@@ -1,0 +1,114 @@
+name: WebGPU 4.7.2 Candidate Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "engine/**"
+      - "tools/engine/**"
+      - "tools/perf/webgpu_browser_smoke.py"
+      - "game/export_presets.cfg"
+      - "game/tests/perf/webgpu_boot/**"
+      - ".github/workflows/webgpu-candidate-build.yml"
+  pull_request:
+    paths:
+      - "engine/**"
+      - "tools/engine/**"
+      - "tools/perf/webgpu_browser_smoke.py"
+      - "game/export_presets.cfg"
+      - "game/tests/perf/webgpu_boot/**"
+      - ".github/workflows/webgpu-candidate-build.yml"
+  workflow_dispatch:
+
+jobs:
+  web-template:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      EM_VERSION: "6.0.9"
+      SCONS_CACHE: ${{ github.workspace }}/.cache/scons-godot-webgpu
+      STARJUNK_CARGO_TARGET_ROOT: ${{ github.workspace }}/.cache/cargo-webgpu
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore WebGPU build caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/scons-godot-webgpu
+            .cache/cargo-webgpu
+          key: webgpu-${{ runner.os }}-toolchain-${{ env.EM_VERSION }}-${{ hashFiles('engine/source-lock.json', 'tools/engine/apply_starjunk_port_patches.py', 'tools/engine/build_webgpu_rust_deps.sh') }}
+          restore-keys: |
+            webgpu-${{ runner.os }}-toolchain-${{ env.EM_VERSION }}-
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set up Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ env.EM_VERSION }}
+          no-cache: true
+      - name: Verify pinned Emscripten identity
+        run: |
+          test "$(python3 -c 'import json; print(json.load(open("engine/source-lock.json"))["emscripten"])')" = "$EM_VERSION"
+          emcc --version
+      - name: Install build dependencies
+        run: python3 -m pip install scons websocket-client
+      - name: Prepare merged Godot 4.7.2 + WebGPU candidate
+        run: tools/engine/prepare_port_candidate.sh build/webgpu-port-candidate
+      - name: Build pinned Rust shader dependencies for Emscripten
+        run: tools/engine/build_webgpu_rust_deps.sh build/webgpu-port-candidate/godot build/webgpu-rust-deps
+      - name: Compile WebGPU web template
+        run: |
+          scons -C build/webgpu-port-candidate/godot \
+            platform=web \
+            target=template_release \
+            threads=no \
+            opengl3=no \
+            webgpu=yes \
+            webgpu_backend=emdawnwebgpu \
+            dlink_enabled=no \
+            lto=none \
+            debug_symbols=no \
+            cache_path="$SCONS_CACHE" \
+            cache_limit=8 \
+            -j2
+      - name: List build outputs
+        if: always()
+        run: find build/webgpu-port-candidate/godot/bin -maxdepth 1 -type f -printf '%f %s bytes\n' 2>/dev/null | sort || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: godot-4.7.2-webgpu-template
+          path: build/webgpu-port-candidate/godot/bin/godot.web.template_release.wasm32.nothreads.zip
+          if-no-files-found: error
+      - name: Download upstream Godot editor for export
+        env:
+          GODOT_VERSION: "4.7.2"
+        run: |
+          curl -fL --retry 3 -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /tmp/godot-editor
+          chmod +x /tmp/godot-editor/Godot_v${GODOT_VERSION}-stable_linux.x86_64
+          echo "GODOT_BIN=/tmp/godot-editor/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Export lightweight Godot WebGPU boot scene
+        run: |
+          tools/engine/export_webgpu_benchmark.sh \
+            "$GODOT_BIN" \
+            "$GITHUB_WORKSPACE/build/webgpu-port-candidate/godot/bin/godot.web.template_release.wasm32.nothreads.zip" \
+            "$GITHUB_WORKSPACE/build/webgpu-boot" \
+            "res://tests/perf/webgpu_boot/webgpu_boot.tscn"
+      - name: Run Chromium Godot WebGPU boot gate
+        run: |
+          python3 tools/perf/webgpu_browser_smoke.py \
+            --root build/webgpu-boot \
+            --output build/webgpu-boot-smoke.json \
+            --result-global __STARJUNK_BOOT_RESULT__ \
+            --purpose browser_webgpu_boot \
+            --expected-profile boot \
+            --timeout 45
+          cat build/webgpu-boot-smoke.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: webgpu-browser-boot
+          path: build/webgpu-boot-smoke.json
+          if-no-files-found: warn
