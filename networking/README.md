@@ -8,8 +8,7 @@ Read:
 - `spritely-bridge.md` — browser/native bridge, control/data plane split and capability facets.
 - `../docs/networking.md` — game-level networking architecture.
 
-The next executable spike should compile a minimal Goblins 0.18 room actor with Hoot 0.9 and prove: create room → register sturdyref → enliven from a second client → grant racer facet → exchange one control event. Only after that should it negotiate the realtime state lane.
-
+The executable spike now proves the native capability flow and the browser runtime boundary. The next networking slice is to extend the private Hoot race-domain dispatcher/façade with asynchronous room join and racer-readiness operations, returning only lifecycle state and opaque OCapN sturdyref strings, then connect those operations to Godot's `MultiplayerAdapter`. High-frequency `starjunk95/race-state/1` snapshots remain on the separate realtime lane.
 
 ## Executable capability spike
 
@@ -19,8 +18,9 @@ The next executable spike should compile a minimal Goblins 0.18 room actor with 
 2. host registers it with MyCapN and serializes its OCapN sturdyref;
 3. client parses/enlivens that sturdyref over a real WebSocket CapTP connection;
 4. client asks the remote room for a racer facet;
-5. the returned racer capability is confirmed to be a remote reference and invoked.
+5. the returned racer capability is confirmed to be a remote reference and invoked;
+6. positive readiness is bound to canonical car and track SHA-256 content IDs.
 
-This specifically verifies reference passing rather than merely serializing room IDs.
+The Spritely CI lane also compiles the CapTP/WebSocket graph with Hoot 0.9.0, checks the exact Goblins browser-host import surface, loads Hoot's pinned runtime assets in headless Chromium, and crosses the private race-domain JavaScript façade without exposing Scheme/Goblins objects to gameplay code.
 
-A second CI step compiles `spritely/hoot-room-smoke.scm` with Hoot 0.9.0. It imports the Goblins CapTP/WebSocket modules and references a browser bootstrap constructor, ensuring the browser-side dependency graph remains Hoot-compilable.
+This verifies reference passing and browser execution rather than merely serializing room IDs. Capability/control messages remain deliberately separate from the realtime snapshot transport.
