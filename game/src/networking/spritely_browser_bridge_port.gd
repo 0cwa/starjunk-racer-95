@@ -42,6 +42,25 @@ func release_room() -> bool:
 		return false
 	return bool(bridge.leaveRoom())
 
+func request_unready() -> bool:
+	var bridge := _resolve_bridge()
+	if bridge == null or str(bridge.controlProtocol) != RaceProtocol.CONTROL_PROTOCOL:
+		return false
+	var callback_id := _allocate_callback_id()
+	var resolved := JavaScriptBridge.create_callback(
+		_on_ready_resolved.bind(callback_id)
+	)
+	var rejected := JavaScriptBridge.create_callback(
+		_on_ready_rejected.bind(callback_id)
+	)
+	_callbacks[callback_id] = [resolved, rejected]
+	var promise = bridge.becomeUnready()
+	if promise == null:
+		_release_callbacks(callback_id)
+		return false
+	promise.then(resolved, rejected)
+	return true
+
 func request_ready(car_content_id: String, track_content_id: String) -> bool:
 	var bridge := _resolve_bridge()
 	if bridge == null or str(bridge.controlProtocol) != RaceProtocol.CONTROL_PROTOCOL:

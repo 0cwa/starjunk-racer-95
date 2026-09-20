@@ -31,7 +31,8 @@
    [(ready value car-content-id track-content-id)
     (and (boolean? value)
          value
-         (ready-content-valid? car-content-id track-content-id))]))
+         (ready-content-valid? car-content-id track-content-id))]
+   [(unready) #t]))
 
 (define-actor (^race-room _bcom)
   (methods

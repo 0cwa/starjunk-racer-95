@@ -109,6 +109,12 @@
         car-content-id
         track-content-id)))
 
+(define (browser-unready)
+  (unless browser-racer
+    (error "cannot become unready before joining a room"))
+  (with-vat* browser-vat
+    (<- browser-racer 'unready)))
+
 (define (browser-leave-room)
   ;; Dropping these references is the browser client's authority release.
   ;; MyCapN/netlayer may remain alive so a later invitation can be joined.
@@ -148,6 +154,10 @@
        (unless (= (length args) 2)
          (error "ready requires car and track content ids"))
        (browser-ready (car args) (cadr args)))
+      ((string=? operation "unready")
+       (unless (null? args)
+         (error "unready does not accept content ids"))
+       (browser-unready))
       (else
        (error "unknown asynchronous Starjunk browser bridge operation"
               operation))))))

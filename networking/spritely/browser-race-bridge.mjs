@@ -99,6 +99,9 @@ export async function loadSpritelyRaceBridge({
       }
       return (await callAsync("ready", carContentId, trackContentId)) === true;
     },
+    async becomeUnready() {
+      return (await callAsync("unready")) === true;
+    },
     leaveRoom() {
       lifecycleGeneration += 1;
       if (call("leave-room") !== true) {
@@ -125,6 +128,9 @@ export async function installSpritelyGodotBridge(options = {}) {
     },
     async becomeReady(carContentId, trackContentId) {
       return await raceBridge.becomeReady(carContentId, trackContentId);
+    },
+    async becomeUnready() {
+      return await raceBridge.becomeUnready();
     },
     leaveRoom() {
       return raceBridge.leaveRoom();

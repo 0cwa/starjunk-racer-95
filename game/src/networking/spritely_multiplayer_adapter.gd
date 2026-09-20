@@ -80,9 +80,6 @@ func publish_race_event(event: Dictionary) -> void:
 		return
 
 	var data: Dictionary = event_copy["data"]
-	if not bool(data.get("ready", false)):
-		race_event_publish_failed.emit(event_copy, "unready publication is not supported by browser bridge yet")
-		return
 	if _ready_pending:
 		race_event_publish_failed.emit(event_copy, "readiness publication already pending")
 		return
@@ -92,11 +89,16 @@ func publish_race_event(event: Dictionary) -> void:
 
 	_ready_pending = true
 	_pending_ready_event = event_copy
-	if bool(_bridge_port.call(
-		"request_ready",
-		str(data["car_content_id"]),
-		str(data["track_content_id"])
-	)):
+	var request_started := false
+	if bool(data.get("ready", false)):
+		request_started = bool(_bridge_port.call(
+			"request_ready",
+			str(data["car_content_id"]),
+			str(data["track_content_id"])
+		))
+	elif _bridge_port.has_method("request_unready"):
+		request_started = bool(_bridge_port.call("request_unready"))
+	if request_started:
 		return
 
 	_ready_pending = false
