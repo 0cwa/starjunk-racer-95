@@ -411,6 +411,10 @@ window.addEventListener('unhandledrejection', (event) => {
                 f"Expected WebGPU RenderingDevice API, got {rendering_api!r} "
                 f"(OS rendering driver label: {driver!r})"
             )
+        if driver != "webgpu":
+            validation_errors.append(
+                f"Expected Web rendering driver label 'webgpu', got {driver!r}"
+            )
         if args.expected_profile and payload.get("profile") != args.expected_profile:
             validation_errors.append(
                 f"Expected profile {args.expected_profile!r}, got {payload.get('profile')!r}"
