@@ -27,10 +27,15 @@ func _process(_delta: float) -> void:
 	_frames += 1
 	if _frames != 8:
 		return
+	var rendering_device: RenderingDevice = RenderingServer.get_rendering_device()
+	var rendering_api := ""
+	if rendering_device != null:
+		rendering_api = rendering_device.get_device_api_name()
 	var result := {
 		"profile": "boot",
 		"renderer": RenderingServer.get_current_rendering_method(),
 		"rendering_driver": RenderingServer.get_current_rendering_driver_name(),
+		"rendering_api": rendering_api,
 		"frames": _frames,
 		"engine_version": Engine.get_version_info().get("string", "unknown"),
 	}
