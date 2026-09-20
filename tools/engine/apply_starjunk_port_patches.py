@@ -28,6 +28,7 @@ def main() -> None:
     device_implementation = source / "drivers/webgpu/rendering_device_driver_webgpu.cpp"
     context_implementation = source / "drivers/webgpu/rendering_context_driver_webgpu.cpp"
     platform_header = source / "drivers/webgpu/webgpu_platform.h"
+    main_implementation = source / "main/main.cpp"
 
     replace_once(
         device_implementation,
@@ -77,6 +78,27 @@ static WGPUTextureFormat starjunk_webgpu_storage_format(
 			return p_format;
 	}
 }
+""",
+    )
+
+    replace_once(
+        main_implementation,
+        """		GLOBAL_DEF_RST(PropertyInfo(Variant::STRING, "rendering/rendering_device/driver.macos", PROPERTY_HINT_ENUM, "metal,vulkan"), "metal");
+
+		GLOBAL_DEF_RST("rendering/rendering_device/fallback_to_vulkan", true);
+""",
+        """		GLOBAL_DEF_RST(PropertyInfo(Variant::STRING, "rendering/rendering_device/driver.macos", PROPERTY_HINT_ENUM, "metal,vulkan"), "metal");
+		GLOBAL_DEF_RST(PropertyInfo(Variant::STRING, "rendering/rendering_device/driver.web", PROPERTY_HINT_ENUM, "webgpu"), "webgpu");
+
+		GLOBAL_DEF_RST("rendering/rendering_device/fallback_to_vulkan", true);
+""",
+    )
+
+    replace_once(
+        main_implementation,
+        """	GLOBAL_DEF_RST_BASIC(PropertyInfo(Variant::STRING, "rendering/renderer/rendering_method.web", PROPERTY_HINT_ENUM, "gl_compatibility"), "gl_compatibility"); // This is a bit of a hack until we have WebGPU support.
+""",
+        """	GLOBAL_DEF_RST_BASIC(PropertyInfo(Variant::STRING, "rendering/renderer/rendering_method.web", PROPERTY_HINT_ENUM, "forward_plus,mobile,gl_compatibility"), "gl_compatibility"); // WebGPU enables RD renderers on Web while retaining compatibility as the default.
 """,
     )
 
