@@ -14,6 +14,7 @@ class FakeBridgePort:
 	var available := true
 	var join_requests: Array[Dictionary] = []
 	var ready_requests: Array[Dictionary] = []
+	var unready_requests := 0
 	var release_requests := 0
 
 	func is_available() -> bool:
@@ -31,6 +32,12 @@ class FakeBridgePort:
 	func release_room() -> bool:
 		release_requests += 1
 		return available
+
+	func request_unready() -> bool:
+		if not available:
+			return false
+		unready_requests += 1
+		return true
 
 	func request_ready(car_content_id: String, track_content_id: String) -> bool:
 		if not available:
@@ -124,6 +131,15 @@ func _test_join_and_readiness() -> void:
 		_check(_published[0] == ready, "published event should preserve validated payload")
 	_check(_publish_failures.is_empty(), "successful readiness should not report publication failure")
 
+	var unready := RaceProtocol.make_racer_ready_event(5, RACER_ID, false)
+	adapter.publish_race_event(unready)
+	_check(bridge.unready_requests == 1, "negative readiness should cross browser port without content ids")
+	bridge.ready_completed.emit(true, "")
+	_check(_published.size() == 2, "acknowledged unready should emit race_event_published")
+	if _published.size() == 2:
+		_check(_published[1] == unready, "published unready event should preserve validated payload")
+	_check(_publish_failures.is_empty(), "successful unready should not report publication failure")
+
 	adapter.leave_room()
 	_check(bridge.release_requests == 1, "leaving should release browser-held racer authority")
 	_check(_left.size() == 1 and _left[0] == ROOM_REFERENCE, "leaving should emit room_left")
@@ -196,9 +212,15 @@ func _test_fail_closed_paths() -> void:
 	adapter.publish_race_event(wrong_racer)
 	_check(bridge.ready_requests.is_empty(), "another racer's event must not cross browser port")
 
-	var unready := RaceProtocol.make_racer_ready_event(6, RACER_ID, false)
-	adapter.publish_race_event(unready)
-	_check(bridge.ready_requests.is_empty(), "unsupported unready event must fail closed")
+	var unsupported := RaceProtocol.make_event(
+		RaceProtocol.EVENT_CHECKPOINT,
+		6,
+		RACER_ID,
+		{"checkpoint_id": "cp-03", "lap": 0}
+	)
+	adapter.publish_race_event(unsupported)
+	_check(bridge.ready_requests.is_empty(), "unsupported control event must not reach ready bridge")
+	_check(bridge.unready_requests == 0, "unsupported control event must not reach unready bridge")
 
 	var invalid := RaceProtocol.make_event(
 		RaceProtocol.EVENT_RACER_READY,
@@ -208,7 +230,7 @@ func _test_fail_closed_paths() -> void:
 	)
 	adapter.publish_race_event(invalid)
 	_check(bridge.ready_requests.is_empty(), "invalid protocol event must not cross browser port")
-	_check(failures.size() == 3, "wrong-racer, unready and invalid events should report failures")
+	_check(failures.size() == 3, "wrong-racer, unsupported and invalid events should report failures")
 
 func _check(condition: bool, message: String) -> void:
 	if not condition:
