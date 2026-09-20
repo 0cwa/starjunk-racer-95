@@ -391,14 +391,7 @@ window.addEventListener('unhandledrejection', (event) => {
 
         renderer = str(payload.get("renderer", "")).lower()
         driver = str(payload.get("rendering_driver", "")).lower()
-        if renderer != "mobile":
-            raise RuntimeError(f"Expected Mobile renderer, got {renderer!r}")
-        if "webgpu" not in driver:
-            raise RuntimeError(f"Expected WebGPU rendering driver, got {driver!r}")
-        if args.expected_profile and payload.get("profile") != args.expected_profile:
-            raise RuntimeError(
-                f"Expected profile {args.expected_profile!r}, got {payload.get('profile')!r}"
-            )
+        rendering_api = str(payload.get("rendering_api", "")).lower()
 
         result = {
             "schema_version": 2,
@@ -409,9 +402,29 @@ window.addEventListener('unhandledrejection', (event) => {
             "payload": payload,
             "cdp_events": summarize_cdp_events(cdp.events),
         }
+
+        validation_errors: list[str] = []
+        if renderer != "mobile":
+            validation_errors.append(f"Expected Mobile renderer, got {renderer!r}")
+        if "webgpu" not in rendering_api:
+            validation_errors.append(
+                f"Expected WebGPU RenderingDevice API, got {rendering_api!r} "
+                f"(OS rendering driver label: {driver!r})"
+            )
+        if args.expected_profile and payload.get("profile") != args.expected_profile:
+            validation_errors.append(
+                f"Expected profile {args.expected_profile!r}, got {payload.get('profile')!r}"
+            )
+
+        if validation_errors:
+            result["error"] = "; ".join(validation_errors)
+
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(result, indent=2))
+
+        if validation_errors:
+            raise RuntimeError(result["error"])
         return 0
     finally:
         if cdp is not None:
