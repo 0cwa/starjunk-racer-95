@@ -35,28 +35,7 @@ main_scene = sys.argv[4]
 
 project = project_path.read_text(encoding="utf-8")
 project, substitutions = re.subn(
-    r'^run/main_scene="[^"]+"
-
-preset = preset_path.read_text(encoding="utf-8")
-marker = "[preset.0.options]\n"
-if marker not in preset:
-    raise SystemExit("Web Benchmark preset options section not found")
-custom_line = f'custom_template/release="{template}"\n'
-preset = preset.replace(marker, marker + "\n" + custom_line, 1)
-preset_path.write_text(preset, encoding="utf-8")
-PY
-
-rm -rf "$OUTPUT_DIR"
-mkdir -p "$OUTPUT_DIR"
-
-"$GODOT_BIN" --headless --path "$ROOT/game" --editor --quit-after 2
-"$GODOT_BIN" --headless --path "$ROOT/game"   --export-release "Web Benchmark" "$OUTPUT_DIR/index.html"
-
-test -s "$OUTPUT_DIR/index.html"
-test -s "$OUTPUT_DIR/index.wasm"
-test -s "$OUTPUT_DIR/index.pck"
-printf 'Exported WebGPU scene %s to %s\n' "$MAIN_SCENE" "$OUTPUT_DIR"
-,
+    r'^run/main_scene="[^"]+"$',
     f'run/main_scene="{main_scene}"',
     project,
     count=1,
@@ -79,7 +58,8 @@ rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
 "$GODOT_BIN" --headless --path "$ROOT/game" --editor --quit-after 2
-"$GODOT_BIN" --headless --path "$ROOT/game"   --export-release "Web Benchmark" "$OUTPUT_DIR/index.html"
+"$GODOT_BIN" --headless --path "$ROOT/game" \
+  --export-release "Web Benchmark" "$OUTPUT_DIR/index.html"
 
 test -s "$OUTPUT_DIR/index.html"
 test -s "$OUTPUT_DIR/index.wasm"
