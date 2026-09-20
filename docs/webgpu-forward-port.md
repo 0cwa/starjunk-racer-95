@@ -30,11 +30,11 @@ Emdawn's timed/infinite `wgpuInstanceWaitAny` path can suspend Wasm through Asyn
 
 The 2026-09-19 candidate successfully reconstructed the pinned merge, built the pinned Rust shader dependencies, compiled the WebGPU Godot template, exported the minimal boot scene, and loaded it in Chromium. `navigator.gpu.requestAdapter()` returned Google's SwiftShader adapter.
 
-Godot then failed before GDScript because device creation hard-required Dawn/experimental feature `texture-formats-tier1`. Chromium rejected `requestDevice()` with:
+The first revived gate removed the Dawn-only experimental feature requirement successfully: Chromium advanced past `texture-formats-tier1` validation. Device creation then failed on the fork's elevated per-stage limits:
 
-`Unsupported feature: texture-formats-tier1`
+`Required limit (48) is greater than the supported limit (16) - maxSampledTexturesPerShaderStage`
 
-The current compatibility patch keeps those tier1/tier2/subgroup/texture-swizzle requirements for desktop Dawn but does not make them hard device requirements under Emdawn/browser WebGPU. Core requirements remain unchanged; if the boot gate exposes another missing core capability, that failure must be handled explicitly rather than blanket-disabling validation.
+The browser compatibility patch now queries the adapter limits and clamps only the fork's elevated sampled-texture/storage-buffer/storage-texture requests (48/12/8) to the adapter's advertised values under Emdawn. Desktop Dawn retains the original requirements. The smoke artifact also records browser adapter features and the relevant limits so later renderer failures are tied to the actual capability envelope rather than guessed constants.
 
 ## Repeatable probes
 

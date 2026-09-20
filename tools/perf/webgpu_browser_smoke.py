@@ -272,7 +272,13 @@ window.addEventListener('unhandledrejection', (event) => {
 
         adapter_probe = cdp.evaluate(
             """(async () => {
-                const result = {has_navigator_gpu: !!navigator.gpu, adapter: false, info: {}};
+                const result = {
+                    has_navigator_gpu: !!navigator.gpu,
+                    adapter: false,
+                    info: {},
+                    features: [],
+                    limits: {}
+                };
                 if (!navigator.gpu) return result;
                 const adapter = await navigator.gpu.requestAdapter();
                 if (!adapter) return result;
@@ -285,6 +291,28 @@ window.addEventListener('unhandledrejection', (event) => {
                         device: info.device || "",
                         description: info.description || ""
                     };
+                } catch (_) {}
+                try {
+                    result.features = Array.from(adapter.features || []).sort();
+                } catch (_) {}
+                try {
+                    const limits = adapter.limits || {};
+                    for (const key of [
+                        "maxBindGroups",
+                        "maxSampledTexturesPerShaderStage",
+                        "maxSamplersPerShaderStage",
+                        "maxStorageBuffersPerShaderStage",
+                        "maxStorageTexturesPerShaderStage",
+                        "maxUniformBuffersPerShaderStage",
+                        "maxBufferSize",
+                        "maxTextureDimension2D",
+                        "maxTextureArrayLayers",
+                        "maxColorAttachments"
+                    ]) {
+                        if (limits[key] !== undefined) {
+                            result.limits[key] = Number(limits[key]);
+                        }
+                    }
                 } catch (_) {}
                 return result;
             })()""",

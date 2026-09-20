@@ -130,6 +130,44 @@ static inline WGPUWaitStatus starjunk_webgpu_emdawn_wait_future(
     )
 
     replace_once(
+        device_implementation,
+        """\tWGPULimits required_limits = WGPU_LIMITS_INIT;
+\trequired_limits.maxBindGroups = WEBGPU_MAX_BIND_GROUPS;
+\t// required_limits.maxImmediateSize = WEBGPU_MAX_IMMEDIATE_SIZE;
+\trequired_limits.maxImmediateSize = 64;
+\trequired_limits.maxSampledTexturesPerShaderStage = 48;
+\trequired_limits.maxStorageBuffersPerShaderStage = 12;
+\trequired_limits.maxStorageTexturesPerShaderStage = 8;
+""",
+        """\tWGPULimits required_limits = WGPU_LIMITS_INIT;
+\trequired_limits.maxBindGroups = WEBGPU_MAX_BIND_GROUPS;
+\t// required_limits.maxImmediateSize = WEBGPU_MAX_IMMEDIATE_SIZE;
+\trequired_limits.maxImmediateSize = 64;
+#if defined(WEBGPU_BACKEND_EMDAWN)
+\t// Browser adapters may expose only the WebGPU baseline per-stage limits.
+\t// Ask for the fork's preferred limits only when the adapter actually
+\t// supports them; later renderer/shader gates will reveal whether lower
+\t// limits need architectural handling rather than making device creation
+\t// impossible up front.
+\tWGPULimits adapter_limits = WGPU_LIMITS_INIT;
+\tWGPUStatus adapter_limits_status = wgpuAdapterGetLimits(adapter, &adapter_limits);
+\tERR_FAIL_COND_V_MSG(adapter_limits_status != WGPUStatus_Success, FAILED,
+\t\t\t"Failed to query WebGPU adapter limits.");
+\trequired_limits.maxSampledTexturesPerShaderStage =
+\t\t\tMIN((uint32_t)48, adapter_limits.maxSampledTexturesPerShaderStage);
+\trequired_limits.maxStorageBuffersPerShaderStage =
+\t\t\tMIN((uint32_t)12, adapter_limits.maxStorageBuffersPerShaderStage);
+\trequired_limits.maxStorageTexturesPerShaderStage =
+\t\t\tMIN((uint32_t)8, adapter_limits.maxStorageTexturesPerShaderStage);
+#else
+\trequired_limits.maxSampledTexturesPerShaderStage = 48;
+\trequired_limits.maxStorageBuffersPerShaderStage = 12;
+\trequired_limits.maxStorageTexturesPerShaderStage = 8;
+#endif
+""",
+    )
+
+    replace_once(
         context_implementation,
         """#if defined(WEBGPU_BACKEND_DAWN_DESKTOP) || defined(WEBGPU_BACKEND_EMDAWN)
 \tstatic const WGPUInstanceFeatureName required_features[] = { WGPUInstanceFeatureName_TimedWaitAny };
