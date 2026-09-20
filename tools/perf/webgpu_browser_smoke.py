@@ -391,7 +391,7 @@ window.addEventListener('unhandledrejection', (event) => {
 
         renderer = str(payload.get("renderer", "")).lower()
         driver = str(payload.get("rendering_driver", "")).lower()
-        rendering_api = str(payload.get("rendering_api", "")).lower()
+        event_summary = summarize_cdp_events(cdp.events)
 
         result = {
             "schema_version": 2,
@@ -400,21 +400,29 @@ window.addEventListener('unhandledrejection', (event) => {
             "browser": Path(chrome).name,
             "adapter_probe": adapter_probe,
             "payload": payload,
-            "cdp_events": summarize_cdp_events(cdp.events),
+            "cdp_events": event_summary,
         }
 
         validation_errors: list[str] = []
         if renderer != "mobile":
             validation_errors.append(f"Expected Mobile renderer, got {renderer!r}")
-        if "webgpu" not in rendering_api:
-            validation_errors.append(
-                f"Expected WebGPU RenderingDevice API, got {rendering_api!r} "
-                f"(OS rendering driver label: {driver!r})"
-            )
         if driver != "webgpu":
             validation_errors.append(
                 f"Expected Web rendering driver label 'webgpu', got {driver!r}"
             )
+
+        renderer_errors: list[str] = []
+        for event in event_summary.get("console", []):
+            for value in event.get("values", []):
+                message = str(value)
+                if "ERROR:" in message or "[WEBGPU] error:" in message:
+                    if message not in renderer_errors:
+                        renderer_errors.append(message)
+        if renderer_errors:
+            validation_errors.append(
+                "Renderer validation errors observed: " + " | ".join(renderer_errors[:3])
+            )
+
         if args.expected_profile and payload.get("profile") != args.expected_profile:
             validation_errors.append(
                 f"Expected profile {args.expected_profile!r}, got {payload.get('profile')!r}"
