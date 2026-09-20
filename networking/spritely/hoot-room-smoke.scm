@@ -51,27 +51,25 @@
                (<= (string-length racer-id) 96))
     (error "invalid racer id"))
 
-  (define mycapn (make-browser-capn))
-  (define remote-room
-    (with-vat browser-vat
-      (await-vow
-       (<- mycapn
-           'enliven
-           (string->ocapn-id room-reference)))))
-  (define protocol
-    (with-vat browser-vat
-      (await-vow (<- remote-room 'protocol))))
-  (unless (string=? protocol race-control-protocol)
-    (error "remote room protocol mismatch" protocol))
-
-  (define racer
-    (with-vat browser-vat
-      (await-vow (<- remote-room 'join racer-id))))
-
-  (set! browser-racer racer)
-  (set! browser-room-reference room-reference)
-  (set! browser-racer-id racer-id)
-  #t)
+  (let* ((mycapn (make-browser-capn))
+         (remote-room
+          (with-vat browser-vat
+            (await-vow
+             (<- mycapn
+                 'enliven
+                 (string->ocapn-id room-reference)))))
+         (protocol
+          (with-vat browser-vat
+            (await-vow (<- remote-room 'protocol)))))
+    (unless (string=? protocol race-control-protocol)
+      (error "remote room protocol mismatch" protocol))
+    (let ((racer
+           (with-vat browser-vat
+             (await-vow (<- remote-room 'join racer-id)))))
+      (set! browser-racer racer)
+      (set! browser-room-reference room-reference)
+      (set! browser-racer-id racer-id)
+      #t)))
 
 (define (browser-ready car-content-id track-content-id)
   (unless browser-racer
