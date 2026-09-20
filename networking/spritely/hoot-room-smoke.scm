@@ -109,6 +109,14 @@
         car-content-id
         track-content-id)))
 
+(define (browser-leave-room)
+  ;; Dropping these references is the browser client's authority release.
+  ;; MyCapN/netlayer may remain alive so a later invitation can be joined.
+  (set! browser-racer #f)
+  (set! browser-room-reference #f)
+  (set! browser-racer-id #f)
+  #t)
+
 (define (browser-bridge-dispatch operation . args)
   (cond
    ((string=? operation "control-protocol")
@@ -122,6 +130,8 @@
     (or browser-room-reference ""))
    ((string=? operation "joined-racer-id")
     (or browser-racer-id ""))
+   ((string=? operation "leave-room")
+    (browser-leave-room))
    (else
     (error "unknown Starjunk browser bridge operation" operation))))
 

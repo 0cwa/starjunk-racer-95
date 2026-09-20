@@ -17,7 +17,7 @@ The executable browser boundary is split in two:
 - `browser-host.mjs` supplies only ambient browser primitives required by Goblins (WebCrypto, typed arrays and WebSocket).
 - `browser-race-bridge.mjs` owns the game-facing race-domain façade. The Hoot reflected procedure is private to this module and must never be returned to Godot.
 
-The initial façade exposes only primitive values: control-protocol identity, browser CapTP availability, and canonical ready-content validation. CI exercises those calls in Chromium through the actual compiled Scheme dispatcher. New operations must preserve this rule: browser callers receive JSON-compatible data or opaque OCapN strings, never Scheme/Goblins objects.
+The façade exposes only primitive values, JSON-compatible lifecycle results and opaque OCapN strings. The browser join path retains room/racer capability references only inside Scheme; Godot sees the invitation string, lifecycle signals and validated event acknowledgements. Leaving a room explicitly clears the Scheme-held racer/room references so local authority is dropped. CI exercises join, content-bound readiness and leave in Chromium through the actual compiled Scheme dispatcher. New operations must preserve this rule: browser callers never receive Scheme/Goblins objects.
 
 ## Two planes
 

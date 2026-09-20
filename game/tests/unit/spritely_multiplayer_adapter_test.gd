@@ -14,6 +14,7 @@ class FakeBridgePort:
 	var available := true
 	var join_requests: Array[Dictionary] = []
 	var ready_requests: Array[Dictionary] = []
+	var release_requests := 0
 
 	func is_available() -> bool:
 		return available
@@ -27,6 +28,10 @@ class FakeBridgePort:
 		})
 		return true
 
+	func release_room() -> bool:
+		release_requests += 1
+		return available
+
 	func request_ready(car_content_id: String, track_content_id: String) -> bool:
 		if not available:
 			return false
@@ -38,6 +43,7 @@ class FakeBridgePort:
 
 var _failures := PackedStringArray()
 var _joined := PackedStringArray()
+var _left := PackedStringArray()
 var _states: Array[StringName] = []
 var _published: Array[Dictionary] = []
 var _publish_failures: Array[Dictionary] = []
@@ -52,6 +58,9 @@ func _test_join_and_readiness() -> void:
 	var adapter := SpritelyMultiplayerAdapter.new(bridge)
 	adapter.room_joined.connect(func(room_id: String) -> void:
 		_joined.append(room_id)
+	)
+	adapter.room_left.connect(func(room_id: String) -> void:
+		_left.append(room_id)
 	)
 	adapter.connection_state_changed.connect(func(state: StringName) -> void:
 		_states.append(state)
@@ -113,6 +122,14 @@ func _test_join_and_readiness() -> void:
 	if _published.size() == 1:
 		_check(_published[0] == ready, "published event should preserve validated payload")
 	_check(_publish_failures.is_empty(), "successful readiness should not report publication failure")
+
+	adapter.leave_room()
+	_check(bridge.release_requests == 1, "leaving should release browser-held racer authority")
+	_check(_left.size() == 1 and _left[0] == ROOM_REFERENCE, "leaving should emit room_left")
+	_check(
+		not _states.is_empty() and _states[-1] == SpritelyMultiplayerAdapter.STATE_DISCONNECTED,
+		"successful authority release should surface disconnected state"
+	)
 
 func _test_fail_closed_paths() -> void:
 	var bridge := FakeBridgePort.new()

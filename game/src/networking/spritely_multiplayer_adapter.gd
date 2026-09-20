@@ -47,6 +47,9 @@ func leave_room() -> void:
 	if not _joined and not _join_pending:
 		return
 	var previous_room := _room_reference
+	var authority_released := true
+	if _bridge_port != null and _bridge_port.has_method("release_room"):
+		authority_released = bool(_bridge_port.call("release_room"))
 	_join_pending = false
 	_joined = false
 	_ready_pending = false
@@ -55,7 +58,9 @@ func leave_room() -> void:
 	_racer_id = ""
 	if not previous_room.is_empty():
 		room_left.emit(previous_room)
-	connection_state_changed.emit(STATE_DISCONNECTED)
+	connection_state_changed.emit(
+		STATE_DISCONNECTED if authority_released else STATE_UNAVAILABLE
+	)
 
 func publish_race_event(event: Dictionary) -> void:
 	var event_copy := event.duplicate(true)

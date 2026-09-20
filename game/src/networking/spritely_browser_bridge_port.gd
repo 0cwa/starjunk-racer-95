@@ -36,6 +36,12 @@ func request_join(room_reference: String, racer_id: String) -> bool:
 	promise.then(resolved, rejected)
 	return true
 
+func release_room() -> bool:
+	var bridge := _resolve_bridge()
+	if bridge == null or str(bridge.controlProtocol) != RaceProtocol.CONTROL_PROTOCOL:
+		return false
+	return bool(bridge.leaveRoom())
+
 func request_ready(car_content_id: String, track_content_id: String) -> bool:
 	var bridge := _resolve_bridge()
 	if bridge == null or str(bridge.controlProtocol) != RaceProtocol.CONTROL_PROTOCOL:

@@ -91,6 +91,15 @@ export async function loadSpritelyRaceBridge({
       }
       return (await callAsync("ready", carContentId, trackContentId)) === true;
     },
+    leaveRoom() {
+      if (call("leave-room") !== true) {
+        throw new Error("Spritely room authority was not released");
+      }
+      if (call("joined-room-reference") !== "" || call("joined-racer-id") !== "") {
+        throw new Error("Spritely room authority remained reachable after leave");
+      }
+      return true;
+    },
   });
 }
 
@@ -107,6 +116,9 @@ export async function installSpritelyGodotBridge(options = {}) {
     },
     async becomeReady(carContentId, trackContentId) {
       return await raceBridge.becomeReady(carContentId, trackContentId);
+    },
+    leaveRoom() {
+      return raceBridge.leaveRoom();
     },
   });
   globalThis.StarjunkSpritely = godotBridge;
