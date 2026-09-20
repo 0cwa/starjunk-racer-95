@@ -4,7 +4,7 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
-apt-get install -y --no-install-recommends   ca-certificates   chromium   guile-3.0   guile-goblins   guile-hoot   guile-gnutls   guile-websocket   nodejs
+apt-get install -y --no-install-recommends   ca-certificates   chromium   chromium-driver   guile-3.0   guile-goblins   guile-hoot   guile-gnutls   guile-websocket   nodejs
 
 GOBLINS_VERSION="$(dpkg-query -W -f='${Version}' guile-goblins)"
 HOOT_VERSION="$(dpkg-query -W -f='${Version}' guile-hoot)"
@@ -113,7 +113,7 @@ fi
 cat "$ROOM_HOST_LOG"
 cat "$ROOM_REFERENCE"
 
-node networking/spritely/tests/run-browser-smoke.mjs "$BROWSER_ROOT" chromium
+node networking/spritely/tests/run-browser-smoke.mjs "$BROWSER_ROOT" chromium chromedriver
 
 cleanup_room_host
 trap - EXIT
