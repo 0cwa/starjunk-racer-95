@@ -14,3 +14,27 @@ Git is canonical history and recovery. Backstitch may be used for live Godot sce
 ## Engine source
 
 `engine/source-lock.json` pins upstream and WebGPU references. `tools/engine/fetch_sources.sh` refuses floating refs. Engine work belongs in a separate engine worktree/fork and should be upstreamable or removable.
+
+
+## Playable Web networking package
+
+The Godot `Web Playable` preset contains only stable bootstrap tags. Spritely/Hoot
+runtime binaries are build outputs and are not vendored in Git.
+
+A reproducible local package flow is:
+
+```sh
+networking/spritely/run_spike.sh
+GODOT_BIN=/path/to/project-webgpu-godot \
+  "$GODOT_BIN" --headless --path game --export-release "Web Playable"
+tools/networking/package_spritely_web.sh build/web-playable
+```
+
+`run_spike.sh` verifies the pinned Goblins/Hoot package families and leaves the
+compiled room Wasm plus the exact Hoot runtime assets under `build/spritely/`.
+The packager refuses an export whose HTML is missing the expected bootstrap
+markers, copies the runtime into `spritely/`, and writes `SHA256SUMS`.
+
+The `Web Playable` target is intended for the project WebGPU export template.
+The networking package itself is renderer-independent so it can be validated
+separately from the engine forward-port.
