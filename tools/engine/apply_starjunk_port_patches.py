@@ -29,6 +29,7 @@ def main() -> None:
     context_implementation = source / "drivers/webgpu/rendering_context_driver_webgpu.cpp"
     platform_header = source / "drivers/webgpu/webgpu_platform.h"
     main_implementation = source / "main/main.cpp"
+    tone_mapper_implementation = source / "servers/rendering/renderer_rd/effects/tone_mapper.cpp"
 
     replace_once(
         device_implementation,
@@ -78,6 +79,50 @@ static WGPUTextureFormat starjunk_webgpu_storage_format(
 			return p_format;
 	}
 }
+""",
+    )
+
+    replace_once(
+        tone_mapper_implementation,
+        """#include "tone_mapper.h"
+
+#include "servers/rendering/renderer_rd/renderer_compositor_rd.h"
+""",
+        """#include "tone_mapper.h"
+
+#include "core/os/os.h"
+#include "servers/rendering/renderer_rd/renderer_compositor_rd.h"
+""",
+    )
+
+    replace_once(
+        tone_mapper_implementation,
+        """\tRID default_sampler = material_storage->sampler_rd_get_default(RSE::CANVAS_ITEM_TEXTURE_FILTER_LINEAR, RSE::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+\tRID default_mipmap_sampler = material_storage->sampler_rd_get_default(RSE::CANVAS_ITEM_TEXTURE_FILTER_LINEAR_WITH_MIPMAPS, RSE::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+
+\tRD::Uniform u_source_color;
+\tu_source_color.uniform_type = RD::UNIFORM_TYPE_INPUT_ATTACHMENT;
+\tu_source_color.binding = 0;
+\tu_source_color.append_id(p_source_color);
+""",
+        """\tRID default_sampler = material_storage->sampler_rd_get_default(RSE::CANVAS_ITEM_TEXTURE_FILTER_LINEAR, RSE::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+\tRID default_mipmap_sampler = material_storage->sampler_rd_get_default(RSE::CANVAS_ITEM_TEXTURE_FILTER_LINEAR_WITH_MIPMAPS, RSE::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+\tRID nearest_sampler = material_storage->sampler_rd_get_default(RSE::CANVAS_ITEM_TEXTURE_FILTER_NEAREST, RSE::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+
+\tRD::Uniform u_source_color;
+\tif (OS::get_singleton()->get_current_rendering_driver_name() == "webgpu") {
+\t\t// The bridge fork disables SUBPASS in the WebGPU tonemap shader because
+\t\t// WebGPU has no Vulkan-style input attachments. Match the resulting
+\t\t// combined-sampler shader contract while the driver emulates subpasses.
+\t\tu_source_color.uniform_type = RD::UNIFORM_TYPE_SAMPLER_WITH_TEXTURE;
+\t\tu_source_color.binding = 0;
+\t\tu_source_color.append_id(p_settings.bilinear_filtering ? default_sampler : nearest_sampler);
+\t\tu_source_color.append_id(p_source_color);
+\t} else {
+\t\tu_source_color.uniform_type = RD::UNIFORM_TYPE_INPUT_ATTACHMENT;
+\t\tu_source_color.binding = 0;
+\t\tu_source_color.append_id(p_source_color);
+\t}
 """,
     )
 
