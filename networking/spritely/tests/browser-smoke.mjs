@@ -6,12 +6,19 @@ const validCar = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456
 const validTrack = "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
 const racerId = "chromium-racer-95";
 
+function mark(state, text) {
+  document.body.dataset.status = state;
+  status.textContent = text;
+}
+
 try {
+  mark("loading-reference", "loading room reference");
   const roomReference = (await (await fetch("./room-reference.txt")).text()).trim();
   if (!roomReference.startsWith("ocapn://")) {
     throw new Error("browser smoke room reference is invalid");
   }
 
+  mark("loading-bridge", "loading Hoot race bridge");
   const bridge = await loadSpritelyRaceBridge({
     SchemeClass: globalThis.HootScheme,
     userImports: createGoblinsBrowserImports(),
@@ -30,6 +37,7 @@ try {
     throw new Error("invalid ready content ID crossed the browser bridge");
   }
 
+  mark("joining", "joining remote Spritely room");
   const joined = await bridge.joinRoom(roomReference, racerId);
   if (
     joined.state !== "joined" ||
@@ -39,16 +47,15 @@ try {
     throw new Error("browser room join returned invalid lifecycle state");
   }
 
+  mark("readying", "binding racer readiness to content");
   if (!(await bridge.becomeReady(validCar, validTrack))) {
     throw new Error("browser racer readiness was not acknowledged");
   }
 
-  document.body.dataset.status = "passed";
-  status.textContent = "Spritely browser room join/readiness passed";
+  mark("passed", "Spritely browser room join/readiness passed");
   document.title = "Starjunk Spritely browser smoke passed";
 } catch (error) {
-  document.body.dataset.status = "failed";
-  status.textContent = error?.stack ?? String(error);
+  mark("failed", error?.stack ?? String(error));
   document.title = "Starjunk Spritely browser smoke failed";
   console.error(error);
 }
