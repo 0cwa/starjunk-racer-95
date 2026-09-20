@@ -2,6 +2,7 @@
 
 - `architecture.md` — system boundaries and invariants.
 - `development.md` — contributor/agent workflow.
+- `development-state.md` — GitHub issue-based current-state and agent handoff protocol.
 - `performance.md` — benchmark and regression policy.
 - `handling.md` — vehicle profile and realism-slider architecture.
 - `prototype-race.md` — current playable local vertical slice and controls.
