@@ -14,7 +14,7 @@ A neo-retro racing game with saturated, sparkly 2.5D/3D visuals, balanced but ch
 
 ## Start here
 
-Read `AGENTS.md`, then `docs/README.md`.
+Read `AGENTS.md`, then `docs/README.md`, then the canonical [Development State — Start Here issue](https://github.com/0cwa/starjunk-racer-95/issues/48). The issue is the current operational snapshot; repository code, tests, CI, docs, and ADRs remain authoritative.
 
 Common commands:
 

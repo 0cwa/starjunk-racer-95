@@ -28,7 +28,12 @@ Do not put gameplay logic in `engine/`. Do not put arbitrary executable code in 
 
 ## Before changing code
 
-Read the closest `AGENTS.md`, relevant ADRs, and `docs/performance.md` if rendering/physics/content density changes.
+1. Read the closest `AGENTS.md`, relevant ADRs, and `docs/performance.md` if rendering/physics/content density changes.
+2. Read `docs/development-state.md`, then fetch the canonical **Development State — Start Here** issue (#48) and the active workstream issues it links.
+3. Inspect current `main`, referenced open PRs, and exact-head CI before choosing the next change.
+4. If an issue snapshot disagrees with the repository, tests, CI, or implementation, treat the executable repository evidence as authoritative and update the issue before proceeding.
+
+Do not rely on prior chat/session context as the only record of current development state.
 
 ## Required validation
 
@@ -49,3 +54,5 @@ Community packages are data by default: manifests, meshes, textures, music metad
 ## Git
 
 Keep commits narrow and descriptive. Generated benchmark results do not belong in Git except approved baselines.
+
+For substantial multi-PR work, use a `[Workstream]` GitHub issue as the operational handoff record. Keep its current state, evidence, next steps, blockers/dependencies, and done criteria current. Before ending a substantial development slice, update that workstream issue and update issue #48 if project-level focus or priority changed. Issues do not replace durable docs/ADRs for architectural decisions.
