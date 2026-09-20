@@ -30,6 +30,57 @@ def main() -> None:
     platform_header = source / "drivers/webgpu/webgpu_platform.h"
 
     replace_once(
+        device_implementation,
+        """static constexpr uint32_t UNIFORM_DYN_MASK = (1u << UNIFORM_DYN_BITS) - 1u;
+""",
+        """static constexpr uint32_t UNIFORM_DYN_MASK = (1u << UNIFORM_DYN_BITS) - 1u;
+
+
+static WGPUTextureFormat starjunk_webgpu_storage_format(
+		WGPUTextureFormat p_format,
+		bool p_has_texture_formats_tier1) {
+	switch (p_format) {
+		case WGPUTextureFormat_R8Unorm:
+		case WGPUTextureFormat_R8Snorm:
+			return p_has_texture_formats_tier1 ? p_format : WGPUTextureFormat_R32Float;
+		case WGPUTextureFormat_R8Uint:
+			return p_has_texture_formats_tier1 ? p_format : WGPUTextureFormat_R32Uint;
+		case WGPUTextureFormat_R8Sint:
+			return p_has_texture_formats_tier1 ? p_format : WGPUTextureFormat_R32Sint;
+		case WGPUTextureFormat_RG8Unorm:
+		case WGPUTextureFormat_RG8Snorm:
+			return p_has_texture_formats_tier1 ? p_format : WGPUTextureFormat_RG32Float;
+		case WGPUTextureFormat_RG8Uint:
+			return p_has_texture_formats_tier1 ? p_format : WGPUTextureFormat_RG32Uint;
+		case WGPUTextureFormat_RG8Sint:
+			return p_has_texture_formats_tier1 ? p_format : WGPUTextureFormat_RG32Sint;
+		case WGPUTextureFormat_R16Unorm:
+		case WGPUTextureFormat_R16Snorm:
+		case WGPUTextureFormat_R16Float:
+			return WGPUTextureFormat_R32Float;
+		case WGPUTextureFormat_R16Uint:
+			return WGPUTextureFormat_R32Uint;
+		case WGPUTextureFormat_R16Sint:
+			return WGPUTextureFormat_R32Sint;
+		case WGPUTextureFormat_RG16Unorm:
+		case WGPUTextureFormat_RG16Snorm:
+		case WGPUTextureFormat_RG16Float:
+			return WGPUTextureFormat_RG32Float;
+		case WGPUTextureFormat_RG16Uint:
+			return WGPUTextureFormat_RG32Uint;
+		case WGPUTextureFormat_RG16Sint:
+			return WGPUTextureFormat_RG32Sint;
+		case WGPUTextureFormat_RGBA16Unorm:
+		case WGPUTextureFormat_RGBA16Snorm:
+			return WGPUTextureFormat_RGBA16Float;
+		default:
+			return p_format;
+	}
+}
+""",
+    )
+
+    replace_once(
         header,
         """\tvirtual DataFormat swap_chain_get_format(SwapChainID p_swap_chain) override final;
 \tvirtual ColorSpace swap_chain_get_color_space(SwapChainID p_swap_chain) override final;
@@ -163,6 +214,148 @@ static inline WGPUWaitStatus starjunk_webgpu_emdawn_wait_future(
 \trequired_limits.maxSampledTexturesPerShaderStage = 48;
 \trequired_limits.maxStorageBuffersPerShaderStage = 12;
 \trequired_limits.maxStorageTexturesPerShaderStage = 8;
+#endif
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """	WGPUTextureFormat texture_format = webgpu_texture_format_from_rd(p_format.format);
+	WGPUTextureFormat view_format = webgpu_texture_format_from_rd(p_view.format);
+	WGPUTextureUsage usage = (WGPUTextureUsage)usage_bits;
+	WGPUTextureAspect aspect = webgpu_texture_aspect_from_rd_format(p_format.format);
+""",
+        """	WGPUTextureFormat texture_format = webgpu_texture_format_from_rd(p_format.format);
+	WGPUTextureFormat view_format = webgpu_texture_format_from_rd(p_view.format);
+#if defined(WEBGPU_BACKEND_EMDAWN)
+	if (p_format.usage_bits & TEXTURE_USAGE_STORAGE_BIT) {
+		const bool has_texture_formats_tier1 =
+				wgpuDeviceHasFeature(device, WGPUFeatureName_TextureFormatsTier1);
+		texture_format = starjunk_webgpu_storage_format(
+				texture_format, has_texture_formats_tier1);
+		view_format = starjunk_webgpu_storage_format(
+				view_format, has_texture_formats_tier1);
+	}
+#endif
+	WGPUTextureUsage usage = (WGPUTextureUsage)usage_bits;
+	WGPUTextureAspect aspect = webgpu_texture_aspect_from_rd_format(p_format.format);
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """	for (uint32_t i = 0; i < p_format.shareable_formats.size(); i++) {
+		DataFormat format = p_format.shareable_formats[i];
+		view_formats.push_back(webgpu_texture_format_from_rd(format));
+	}
+	view_formats.push_back(view_format);
+""",
+        """	for (uint32_t i = 0; i < p_format.shareable_formats.size(); i++) {
+		DataFormat format = p_format.shareable_formats[i];
+		WGPUTextureFormat shareable_format = webgpu_texture_format_from_rd(format);
+#if defined(WEBGPU_BACKEND_EMDAWN)
+		if (p_format.usage_bits & TEXTURE_USAGE_STORAGE_BIT) {
+			shareable_format = starjunk_webgpu_storage_format(
+					shareable_format,
+					wgpuDeviceHasFeature(device, WGPUFeatureName_TextureFormatsTier1));
+		}
+#endif
+		view_formats.push_back(shareable_format);
+	}
+	view_formats.push_back(view_format);
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """					layout_entry.storageTexture = (WGPUStorageTextureBindingLayout){
+						.access = access,
+						.format = webgpu_texture_format_from_rd(info.image_format),
+						.viewDimension = viewDimension,
+					};
+""",
+        """					WGPUTextureFormat storage_format =
+							webgpu_texture_format_from_rd(info.image_format);
+#if defined(WEBGPU_BACKEND_EMDAWN)
+					storage_format = starjunk_webgpu_storage_format(
+							storage_format,
+							wgpuDeviceHasFeature(device, WGPUFeatureName_TextureFormatsTier1));
+#endif
+					layout_entry.storageTexture = (WGPUStorageTextureBindingLayout){
+						.access = access,
+						.format = storage_format,
+						.viewDimension = viewDimension,
+					};
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """		ERR_FAIL_COND_V_MSG(!ok, ShaderID(), vformat("Failed to decompress WGSL on shader stage %s.", String(SHADER_STAGE_NAMES[shader.shader_stage])));
+
+		WGPUShaderSourceWGSL source = (WGPUShaderSourceWGSL){
+""",
+        """		ERR_FAIL_COND_V_MSG(!ok, ShaderID(), vformat("Failed to decompress WGSL on shader stage %s.", String(SHADER_STAGE_NAMES[shader.shader_stage])));
+
+		const char *wgsl_source_data = (const char *)decompressed_code.ptr();
+		size_t wgsl_source_length = source_size;
+		String starjunk_wgsl;
+		CharString starjunk_wgsl_utf8;
+#if defined(WEBGPU_BACKEND_EMDAWN)
+		starjunk_wgsl = String((const char *)decompressed_code.ptr());
+		const bool has_texture_formats_tier1 =
+				wgpuDeviceHasFeature(device, WGPUFeatureName_TextureFormatsTier1);
+		if (!has_texture_formats_tier1) {
+			starjunk_wgsl = starjunk_wgsl.replace("rg8unorm", "rg32float");
+			starjunk_wgsl = starjunk_wgsl.replace("rg8snorm", "rg32float");
+			starjunk_wgsl = starjunk_wgsl.replace("rg8uint", "rg32uint");
+			starjunk_wgsl = starjunk_wgsl.replace("rg8sint", "rg32sint");
+			starjunk_wgsl = starjunk_wgsl.replace("r8unorm", "r32float");
+			starjunk_wgsl = starjunk_wgsl.replace("r8snorm", "r32float");
+			starjunk_wgsl = starjunk_wgsl.replace("r8uint", "r32uint");
+			starjunk_wgsl = starjunk_wgsl.replace("r8sint", "r32sint");
+		}
+		starjunk_wgsl = starjunk_wgsl.replace("rgba16snorm", "rgba16float");
+		starjunk_wgsl = starjunk_wgsl.replace("rgba16unorm", "rgba16float");
+		starjunk_wgsl = starjunk_wgsl.replace("rg16float", "rg32float");
+		starjunk_wgsl = starjunk_wgsl.replace("rg16snorm", "rg32float");
+		starjunk_wgsl = starjunk_wgsl.replace("rg16unorm", "rg32float");
+		starjunk_wgsl = starjunk_wgsl.replace("rg16uint", "rg32uint");
+		starjunk_wgsl = starjunk_wgsl.replace("rg16sint", "rg32sint");
+		starjunk_wgsl = starjunk_wgsl.replace("r16float", "r32float");
+		starjunk_wgsl = starjunk_wgsl.replace("r16snorm", "r32float");
+		starjunk_wgsl = starjunk_wgsl.replace("r16unorm", "r32float");
+		starjunk_wgsl = starjunk_wgsl.replace("r16uint", "r32uint");
+		starjunk_wgsl = starjunk_wgsl.replace("r16sint", "r32sint");
+		starjunk_wgsl_utf8 = starjunk_wgsl.utf8();
+		wgsl_source_data = starjunk_wgsl_utf8.get_data();
+		wgsl_source_length = (size_t)starjunk_wgsl_utf8.length();
+#endif
+
+		WGPUShaderSourceWGSL source = (WGPUShaderSourceWGSL){
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """			.code = (WGPUStringView){
+					.data = (const char *)decompressed_code.ptr(),
+					.length = source_size,
+			},
+		};
+
+		shader_info->shader_contents.push_back(String((const char *)decompressed_code.ptr()));
+""",
+        """			.code = (WGPUStringView){
+					.data = wgsl_source_data,
+					.length = wgsl_source_length,
+			},
+		};
+
+#if defined(WEBGPU_BACKEND_EMDAWN)
+		shader_info->shader_contents.push_back(starjunk_wgsl);
+#else
+		shader_info->shader_contents.push_back(String((const char *)decompressed_code.ptr()));
 #endif
 """,
     )
