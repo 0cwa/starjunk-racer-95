@@ -63,12 +63,17 @@ try {
     throw new Error("browser racer readiness was not acknowledged");
   }
 
+  mark("unreadying", "clearing racer readiness without content ids");
+  if (!(await bridge.becomeUnready())) {
+    throw new Error("browser racer unready transition was not acknowledged");
+  }
+
   mark("leaving", "releasing browser racer authority");
   if (!bridge.leaveRoom()) {
     throw new Error("Godot-visible browser bridge did not release room authority");
   }
 
-  mark("passed", "Spritely browser join/readiness/leave passed");
+  mark("passed", "Spritely browser ready/unready/leave passed");
   document.title = "Starjunk Spritely browser smoke passed";
 } catch (error) {
   mark("failed", error?.stack ?? String(error));
