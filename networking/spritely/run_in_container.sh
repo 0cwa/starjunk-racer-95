@@ -55,7 +55,7 @@ NODE
 test -s build/spritely/starjunk-spritely-room.imports.json
 node networking/spritely/tests/browser-host-contract.mjs   build/spritely/starjunk-spritely-room.imports.json
 
-# Use the runtime assets shipped by the exact Hoot package under test.  Do not
+# Use the runtime assets shipped by the exact Hoot package under test. Do not
 # vendor a second copy that can drift independently from the compiler/runtime.
 HOOT_REFLECT_JS="$(dpkg -L guile-hoot | awk '/\/reflect-js\/reflect\.js$/ { print; exit }')"
 HOOT_REFLECT_WASM="$(dpkg -L guile-hoot | awk '/\/reflect-wasm\/reflect\.wasm$/ { print; exit }')"
@@ -77,7 +77,46 @@ cp networking/spritely/browser-race-bridge.mjs "$BROWSER_ROOT/"
 cp networking/spritely/tests/browser-smoke.html "$BROWSER_ROOT/"
 cp networking/spritely/tests/browser-smoke.mjs "$BROWSER_ROOT/"
 
+ROOM_HOST_LOG=build/spritely/browser-room-host.log
+ROOM_REFERENCE="$BROWSER_ROOT/room-reference.txt"
+rm -f "$ROOM_REFERENCE" "$ROOM_HOST_LOG"
+
+guile -L networking/spritely   networking/spritely/tests/browser-room-host.scm   "$ROOM_REFERENCE" >"$ROOM_HOST_LOG" 2>&1 &
+ROOM_HOST_PID=$!
+
+cleanup_room_host() {
+  if kill -0 "$ROOM_HOST_PID" 2>/dev/null; then
+    kill "$ROOM_HOST_PID" 2>/dev/null || true
+    wait "$ROOM_HOST_PID" 2>/dev/null || true
+  fi
+}
+trap cleanup_room_host EXIT
+
+for _ in $(seq 1 100); do
+  if [[ -s "$ROOM_REFERENCE" ]]; then
+    break
+  fi
+  if ! kill -0 "$ROOM_HOST_PID" 2>/dev/null; then
+    cat "$ROOM_HOST_LOG" >&2
+    echo "Browser room host exited before producing a sturdyref" >&2
+    exit 3
+  fi
+  sleep 0.1
+done
+
+if [[ ! -s "$ROOM_REFERENCE" ]]; then
+  cat "$ROOM_HOST_LOG" >&2
+  echo "Timed out waiting for browser room sturdyref" >&2
+  exit 3
+fi
+
+cat "$ROOM_HOST_LOG"
+cat "$ROOM_REFERENCE"
+
 node networking/spritely/tests/run-browser-smoke.mjs "$BROWSER_ROOT" chromium
 
+cleanup_room_host
+trap - EXIT
+
 cat build/spritely/starjunk-spritely-room.imports.json
-printf 'Spritely native + browser race bridge probes passed\n'
+printf 'Spritely native + browser remote room/readiness probes passed\n'

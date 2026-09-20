@@ -14,6 +14,7 @@ const mimeTypes = new Map([
   [".html", "text/html; charset=utf-8"],
   [".js", "text/javascript; charset=utf-8"],
   [".mjs", "text/javascript; charset=utf-8"],
+  [".txt", "text/plain; charset=utf-8"],
   [".wasm", "application/wasm"],
 ]);
 
@@ -57,7 +58,7 @@ const args = [
   "--no-sandbox",
   "--disable-dev-shm-usage",
   "--disable-gpu",
-  "--virtual-time-budget=10000",
+  "--virtual-time-budget=20000",
   "--dump-dom",
   url,
 ];
@@ -79,7 +80,7 @@ child.stderr.on("data", (chunk) => {
 
 const timeout = setTimeout(() => {
   child.kill("SIGKILL");
-}, 30000);
+}, 40000);
 
 const exitCode = await new Promise((resolve, reject) => {
   child.once("error", reject);
@@ -103,4 +104,4 @@ if (exitCode !== 0 || !stdout.includes('data-status="passed"')) {
   );
 }
 
-console.log("Spritely real-browser Wasm instantiation passed");
+console.log("Spritely browser remote room/readiness passed");
