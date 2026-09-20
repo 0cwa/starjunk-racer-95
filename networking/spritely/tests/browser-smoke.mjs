@@ -37,6 +37,21 @@ try {
     throw new Error("invalid ready content ID crossed the browser bridge");
   }
 
+  mark("cancelling-join", "proving pending join cancellation releases authority");
+  const cancelledJoin = bridge.joinRoom(roomReference, racerId + "-cancelled");
+  if (!bridge.leaveRoom()) {
+    throw new Error("pending browser room join could not be cancelled");
+  }
+  let cancelled = false;
+  try {
+    await cancelledJoin;
+  } catch (error) {
+    cancelled = String(error).includes("cancelled");
+  }
+  if (!cancelled) {
+    throw new Error("cancelled browser room join unexpectedly completed");
+  }
+
   mark("joining", "joining remote Spritely room");
   const joinedReference = await bridge.joinRoom(roomReference, racerId);
   if (joinedReference !== roomReference) {

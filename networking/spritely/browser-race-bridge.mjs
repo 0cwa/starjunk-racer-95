@@ -46,6 +46,8 @@ export async function loadSpritelyRaceBridge({
     return reflector.car(reflectedValues);
   }
 
+  let lifecycleGeneration = 0;
+
   const controlProtocol = call("control-protocol");
   const browserCapnSupported = call("browser-capn-supported");
   if (typeof controlProtocol !== "string" || typeof browserCapnSupported !== "boolean") {
@@ -71,12 +73,18 @@ export async function loadSpritelyRaceBridge({
       ) {
         throw new Error("invalid room join request");
       }
+      const generation = ++lifecycleGeneration;
       if ((await callAsync("join-room", roomReference, racerId)) !== true) {
         throw new Error("Spritely room join was not acknowledged");
+      }
+      if (generation !== lifecycleGeneration) {
+        call("leave-room");
+        throw new Error("Spritely room join was cancelled");
       }
       const storedReference = call("joined-room-reference");
       const storedRacerId = call("joined-racer-id");
       if (storedReference !== roomReference || storedRacerId !== racerId) {
+        call("leave-room");
         throw new Error("Spritely room join state did not round-trip");
       }
       return Object.freeze({
@@ -92,6 +100,7 @@ export async function loadSpritelyRaceBridge({
       return (await callAsync("ready", carContentId, trackContentId)) === true;
     },
     leaveRoom() {
+      lifecycleGeneration += 1;
       if (call("leave-room") !== true) {
         throw new Error("Spritely room authority was not released");
       }

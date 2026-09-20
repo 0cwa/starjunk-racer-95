@@ -50,6 +50,7 @@ var _publish_failures: Array[Dictionary] = []
 
 func _ready() -> void:
 	_test_join_and_readiness()
+	_test_leave_cancels_pending_join()
 	_test_fail_closed_paths()
 	_finish()
 
@@ -130,6 +131,30 @@ func _test_join_and_readiness() -> void:
 		not _states.is_empty() and _states[-1] == SpritelyMultiplayerAdapter.STATE_DISCONNECTED,
 		"successful authority release should surface disconnected state"
 	)
+
+func _test_leave_cancels_pending_join() -> void:
+	var bridge := FakeBridgePort.new()
+	var adapter := SpritelyMultiplayerAdapter.new(bridge)
+	var joined := PackedStringArray()
+	var states: Array[StringName] = []
+	adapter.room_joined.connect(func(room_id: String) -> void:
+		joined.append(room_id)
+	)
+	adapter.connection_state_changed.connect(func(state: StringName) -> void:
+		states.append(state)
+	)
+
+	_check(adapter.join_room(ROOM_REFERENCE, RACER_ID), "pending join cancellation fixture should start")
+	adapter.leave_room()
+	_check(bridge.release_requests == 1, "cancelling a pending join should release browser authority")
+	_check(
+		not states.is_empty() and states[-1] == SpritelyMultiplayerAdapter.STATE_DISCONNECTED,
+		"cancelled pending join should surface disconnected state"
+	)
+
+	# A late browser callback must not resurrect local membership.
+	bridge.join_completed.emit(true, ROOM_REFERENCE, RACER_ID, "")
+	_check(joined.is_empty(), "late completion after leave must not emit room_joined")
 
 func _test_fail_closed_paths() -> void:
 	var bridge := FakeBridgePort.new()
