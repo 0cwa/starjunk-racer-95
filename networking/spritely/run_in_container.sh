@@ -113,7 +113,10 @@ fi
 cat "$ROOM_HOST_LOG"
 cat "$ROOM_REFERENCE"
 
-node networking/spritely/tests/run-browser-smoke.mjs "$BROWSER_ROOT" chromium chromedriver
+node networking/spritely/tests/run-browser-smoke.mjs \
+  "$BROWSER_ROOT" \
+  "$(command -v chromium)" \
+  "$(command -v chromedriver)"
 
 cleanup_room_host
 trap - EXIT
