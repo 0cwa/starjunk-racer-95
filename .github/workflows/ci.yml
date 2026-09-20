@@ -72,6 +72,11 @@ jobs:
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/race_protocol_test.tscn'
       - name: Run Spritely multiplayer adapter tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/spritely_multiplayer_adapter_test.tscn'
+      - name: Pack playable Web resources
+        run: |
+          mkdir -p build/ci-web-export
+          "$GODOT_BIN" --headless --path game             --export-pack "Web Playable"             "$GITHUB_WORKSPACE/build/ci-web-export/starjunk.pck"
+          test -s build/ci-web-export/starjunk.pck
       - name: Run race content agreement integration test
         run: 'timeout 45s "$GODOT_BIN" --headless --path game res://tests/integration/race_content_agreement_test.tscn'
       - name: Run community package safety tests
