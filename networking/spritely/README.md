@@ -11,7 +11,7 @@ CI proves six things against the pinned Goblins 0.18 / Hoot 0.9 package families
 3. **Hoot browser compilation:** the CapTP/WebSocket dependency graph and Starjunk room actor compile into browser-targeted Wasm.
 4. **Browser host contract:** CI records `WebAssembly.Module.imports()` for that Wasm, removes the standard Hoot runtime modules, and requires the remaining Goblins WebCrypto, typed-array and WebSocket imports to exactly match `browser-host.mjs`. The same probe exercises Ed25519 sign/verify, SHA-256, typed arrays and WebSocket callback semantics under JavaScript.
 5. **Real-browser instantiation:** CI copies `reflect.js`, `reflect.wasm` and `wtf8.wasm` from the exact pinned Hoot package, serves them with the compiled Starjunk module over localhost, and requires headless Chromium to instantiate the module with the Starjunk browser host imports.
-6. **Race-domain browser seam:** the Hoot module returns one private dispatcher, `browser-race-bridge.mjs` hides it, and Chromium must cross that seam to read the control protocol and validate canonical car/track content IDs. No reflected Scheme/Goblins object is returned by the public JavaScript façade.
+6. **Race-domain browser seam:** the Hoot module keeps remote room/racer references private, `browser-race-bridge.mjs` exposes only primitive/opaque race-domain values, and Chromium proves join → content-bound readiness → leave against a live native room. Leaving explicitly drops the browser-held racer capability. No reflected Scheme/Goblins object is returned by the public JavaScript façade.
 
 The native tests deliberately do not send high-frequency car snapshots through Goblins. CapTP authorizes rooms/facets/content and the realtime data lane remains a separate adapter.
 
@@ -31,4 +31,4 @@ The native tests deliberately do not send high-frequency car snapshots through G
 
 Hoot supplies its generic runtime/FFI/I/O/finalization modules. Starjunk owns only the Goblins-specific browser imports that need ambient browser APIs, keeping those capabilities out of gameplay code. The real-browser probe deliberately packages Hoot's runtime assets from the installed pinned package rather than committing a duplicate copy.
 
-The next slice is to extend the same private dispatcher/façade with asynchronous room join and racer readiness operations that return only lifecycle state and opaque OCapN sturdyref strings, then connect those operations to Godot's `MultiplayerAdapter`. High-frequency snapshots remain on the separate realtime lane.
+Godot now has a tested `SpritelyMultiplayerAdapter` boundary and a tiny web-only JavaScriptBridge port. The next slice is packaging the pinned Hoot/Spritely browser assets beside a playable Godot Web export and bootstrapping the `StarjunkSpritely` global before the adapter is used. High-frequency snapshots remain on the separate realtime lane.
