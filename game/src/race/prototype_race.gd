@@ -112,6 +112,12 @@ func configure_presentation(cue_set: Dictionary) -> String:
 	_refresh_presentation_targets()
 	return ""
 
+func clear_presentation() -> void:
+	if presentation_director == null or presentation_adapter == null:
+		return
+	presentation_director.clear()
+	presentation_adapter.reset_to_baseline()
+
 func advance_presentation_to(time_ms: int) -> Array[Dictionary]:
 	if presentation_director == null:
 		return []
@@ -156,6 +162,16 @@ func mount_community_bundle(bundle: Dictionary) -> String:
 	var track_content_id := str(bundle["track_content_id"])
 	if not car_content_id.begins_with("sha256:") or not track_content_id.begins_with("sha256:"):
 		return "community bundle content ids must be SHA-256 identifiers"
+
+	var song_cue_set: Dictionary = {}
+	if bundle.has("song_cue_set"):
+		if not bundle["song_cue_set"] is Dictionary:
+			return "community bundle song_cue_set must be an object"
+		song_cue_set = bundle["song_cue_set"]
+		if not song_cue_set.is_empty():
+			var cue_error := SongCueTimeline.validate(song_cue_set)
+			if not cue_error.is_empty():
+				return "community bundle song cue set is invalid: %s" % cue_error
 
 	var checkpoints = bundle["checkpoints"]
 	var spawn_points = bundle["spawn_points"]
@@ -207,10 +223,16 @@ func mount_community_bundle(bundle: Dictionary) -> String:
 	_build_vehicle(profile, car_visual, visual_scale)
 	set_realism(starting_realism)
 	reset_vehicle()
+	clear_presentation()
+	if not song_cue_set.is_empty():
+		var presentation_error := configure_presentation(song_cue_set)
+		if not presentation_error.is_empty():
+			return "community presentation configuration failed: %s" % presentation_error
 	bundle.clear()
 	return ""
 
 func restore_generated_content() -> void:
+	clear_presentation()
 	active_car_content_id = ""
 	active_track_content_id = ""
 	_next_checkpoint = 0
