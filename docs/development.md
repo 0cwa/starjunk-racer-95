@@ -1,11 +1,14 @@
 # Development workflow
 
 1. Read the nearest `AGENTS.md`.
-2. Make the smallest coherent change.
-3. Run `make check`.
-4. If Godot is available, import/load affected scenes headlessly.
-5. For rendering-density changes, run the benchmark on a comparable runner and attach results to the PR.
-6. Update docs/ADRs when architecture changes.
+2. Read `docs/development-state.md`, GitHub issue #48, and the active workstream issue(s) relevant to the task.
+3. Reconcile issue state with current `main`, open PRs, and exact-head CI.
+4. Make the smallest coherent change.
+5. Run `make check`.
+6. If Godot is available, import/load affected scenes headlessly.
+7. For rendering-density changes, run the benchmark on a comparable runner and attach results to the PR.
+8. Update docs/ADRs when architecture changes.
+9. Before ending a substantial development slice, update the affected workstream issue and issue #48 when project-level focus or priority changed.
 
 ## Git and Backstitch
 
@@ -38,3 +41,27 @@ markers, copies the runtime into `spritely/`, and writes `SHA256SUMS`.
 The `Web Playable` target is intended for the project WebGPU export template.
 The networking package itself is renderer-independent so it can be validated
 separately from the engine forward-port.
+
+
+## Development-state handoff
+
+GitHub Issues are the operational handoff layer for current development state.
+
+- **Issue #48 — Development State — Start Here** is the compact project-level snapshot: active workstreams, current primary focus, current blockers, and priority order.
+- **`[Workstream]` issues** hold the detailed state for efforts expected to span multiple commits or PRs.
+- **Pull requests** are implementation/review units, not the canonical roadmap.
+- **Repository docs and ADRs** hold durable architecture and policy, not ephemeral status.
+
+A workstream issue should keep these sections current:
+
+- Goal.
+- Current state.
+- Latest evidence, preferably exact commit/PR/workflow-run evidence.
+- Next steps in execution order.
+- Blockers/dependencies.
+- Done criteria.
+- Durable constraints that matter specifically to the workstream.
+
+Update the issue body when the current snapshot changes materially. Use comments for noteworthy historical evidence that does not belong in the compact current snapshot. Close a workstream issue when its stated milestone is complete; open a successor issue if the next milestone is materially different.
+
+Do not copy large architecture documents into issues. Link the durable source instead. If issue text and executable repository evidence disagree, update the issue rather than coding against stale state.
