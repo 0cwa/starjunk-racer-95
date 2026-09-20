@@ -71,3 +71,17 @@ The permanent boot contract now checks
 `RenderingServer.get_rendering_device().get_device_api_name()`, which is implemented
 by the WebGPU driver as `"WebGpu"`. The Chromium smoke artifact is written before
 post-boot assertions so future backend-identity or profile mismatches remain inspectable.
+
+
+### Web rendering-driver identity
+
+The bridge fork had WebGPU registered in `DisplayServerWeb` but omitted the
+platform-specific project-setting default that exists in the polished reference:
+`rendering/rendering_device/driver.web = "webgpu"`. As a result, the WebGPU
+RenderingDevice could boot while `RenderingServer.get_current_rendering_driver_name()`
+still reported the generic `"vulkan"` default. That is not only cosmetic: Godot
+uses the current rendering-driver name when defining renderer shader macros.
+
+The compatibility patch now ports the reference's WebGPU driver override and
+Web renderer hint list. The browser boot gate requires both the OS/display driver
+label and `RenderingDevice.get_device_api_name()` to identify WebGPU.
