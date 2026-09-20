@@ -53,7 +53,8 @@ At the start of substantive work:
 3. fetch issue #48;
 4. fetch linked workstream issue(s);
 5. fetch current `main`, referenced PR heads, and exact-head CI;
-6. reconcile stale issue state against the repository before selecting work.
+6. do not treat unrelated open PRs as active work merely because they are open; inspect their stated disposition before reusing them;
+7. reconcile stale issue state against the repository before selecting work.
 
 During work, update a workstream issue when a material fact changes, such as:
 

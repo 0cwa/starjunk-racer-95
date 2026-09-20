@@ -31,7 +31,8 @@ Do not put gameplay logic in `engine/`. Do not put arbitrary executable code in 
 1. Read the closest `AGENTS.md`, relevant ADRs, and `docs/performance.md` if rendering/physics/content density changes.
 2. Read `docs/development-state.md`, then fetch the canonical **Development State — Start Here** issue (#48) and the active workstream issues it links.
 3. Inspect current `main`, referenced open PRs, and exact-head CI before choosing the next change.
-4. If an issue snapshot disagrees with the repository, tests, CI, or implementation, treat the executable repository evidence as authoritative and update the issue before proceeding.
+4. Do not infer priority from an open PR. Unless #48 or an active workstream explicitly references it, treat it as deferred/historical until you inspect its current disposition.
+5. If an issue snapshot disagrees with the repository, tests, CI, or implementation, treat the executable repository evidence as authoritative and update the issue before proceeding.
 
 Do not rely on prior chat/session context as the only record of current development state.
 
