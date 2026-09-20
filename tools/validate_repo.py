@@ -11,7 +11,10 @@ REQUIRED = [
     "docs/README.md",
     "engine/source-lock.json",
     "networking/source-lock.json",
+    "networking/spritely/web/bootstrap.mjs",
+    "tools/networking/package_spritely_web.sh",
     "game/project.godot",
+    "game/export_presets.cfg",
     "game/tests/perf/renderer_torture/renderer_torture.tscn",
     "game/tests/perf/renderer_torture/renderer_torture.gd",
     "packages/schemas/car.schema.json",
@@ -84,6 +87,16 @@ def main() -> None:
         raise SystemExit(
             "networking/source-lock.json realtime protocol does not match RaceProtocol"
         )
+
+    export_presets = (ROOT / "game/export_presets.cfg").read_text(encoding="utf-8")
+    for marker in (
+        'name="Web Playable"',
+        'spritely/reflect.js',
+        'globalThis.HootScheme = Scheme',
+        'spritely/bootstrap.mjs',
+    ):
+        if marker not in export_presets:
+            raise SystemExit(f"Web Playable export is missing Spritely bootstrap marker: {marker}")
 
     print("Repository invariants OK")
 

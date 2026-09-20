@@ -6,10 +6,14 @@ import path from "node:path";
 const rootArg = process.argv[2];
 const chromium = process.argv[3] ?? process.env.CHROMIUM_BIN ?? "chromium";
 const chromeDriver = process.argv[4] ?? process.env.CHROMEDRIVER_BIN ?? "chromedriver";
+const page = process.argv[5] ?? "browser-smoke.html";
 if (!rootArg) {
   throw new Error(
-    "usage: run-browser-smoke.mjs <browser-root> [chromium] [chromedriver]",
+    "usage: run-browser-smoke.mjs <browser-root> [chromium] [chromedriver] [page]",
   );
+}
+if (page.startsWith("/") || page.includes("..")) {
+  throw new Error("browser smoke page must stay within the served root");
 }
 
 const root = path.resolve(rootArg);
@@ -54,7 +58,7 @@ if (!address || typeof address === "string") {
   server.close();
   throw new Error("unable to determine browser smoke server port");
 }
-const pageUrl = `http://127.0.0.1:${address.port}/browser-smoke.html`;
+const pageUrl = `http://127.0.0.1:${address.port}/${page}`;
 
 const driverPort = 9515;
 const driverUrl = `http://127.0.0.1:${driverPort}`;

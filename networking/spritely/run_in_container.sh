@@ -65,17 +65,36 @@ for asset in "$HOOT_REFLECT_JS" "$HOOT_REFLECT_WASM" "$HOOT_WTF8_WASM"; do
   test -s "$asset"
 done
 
+RUNTIME_ROOT=build/spritely/runtime
+rm -rf "$RUNTIME_ROOT"
+mkdir -p "$RUNTIME_ROOT"
+cp "$HOOT_REFLECT_JS" "$RUNTIME_ROOT/reflect.js"
+cp "$HOOT_REFLECT_WASM" "$RUNTIME_ROOT/reflect.wasm"
+cp "$HOOT_WTF8_WASM" "$RUNTIME_ROOT/wtf8.wasm"
+
 BROWSER_ROOT=build/spritely/browser
 rm -rf "$BROWSER_ROOT"
 mkdir -p "$BROWSER_ROOT"
-cp "$HOOT_REFLECT_JS" "$BROWSER_ROOT/reflect.js"
-cp "$HOOT_REFLECT_WASM" "$BROWSER_ROOT/reflect.wasm"
-cp "$HOOT_WTF8_WASM" "$BROWSER_ROOT/wtf8.wasm"
+cp "$RUNTIME_ROOT/reflect.js" "$BROWSER_ROOT/reflect.js"
+cp "$RUNTIME_ROOT/reflect.wasm" "$BROWSER_ROOT/reflect.wasm"
+cp "$RUNTIME_ROOT/wtf8.wasm" "$BROWSER_ROOT/wtf8.wasm"
 cp build/spritely/starjunk-spritely-room.wasm "$BROWSER_ROOT/"
 cp networking/spritely/browser-host.mjs "$BROWSER_ROOT/"
 cp networking/spritely/browser-race-bridge.mjs "$BROWSER_ROOT/"
 cp networking/spritely/tests/browser-smoke.html "$BROWSER_ROOT/"
 cp networking/spritely/tests/browser-smoke.mjs "$BROWSER_ROOT/"
+
+PACKAGED_ROOT=build/spritely/godot-web-package
+rm -rf "$PACKAGED_ROOT"
+mkdir -p "$PACKAGED_ROOT"
+cp networking/spritely/tests/packaged-web-smoke.html "$PACKAGED_ROOT/index.html"
+cp networking/spritely/tests/packaged-web-smoke.mjs "$PACKAGED_ROOT/"
+tools/networking/package_spritely_web.sh "$PACKAGED_ROOT"
+test -s "$PACKAGED_ROOT/spritely/SHA256SUMS"
+(
+  cd "$PACKAGED_ROOT/spritely"
+  sha256sum -c SHA256SUMS
+)
 
 ROOM_HOST_LOG=build/spritely/browser-room-host.log
 ROOM_REFERENCE="$BROWSER_ROOT/room-reference.txt"
@@ -118,8 +137,15 @@ node networking/spritely/tests/run-browser-smoke.mjs \
   "$(command -v chromium)" \
   "$(command -v chromedriver)"
 
+cp "$ROOM_REFERENCE" "$PACKAGED_ROOT/room-reference.txt"
+node networking/spritely/tests/run-browser-smoke.mjs \
+  "$PACKAGED_ROOT" \
+  "$(command -v chromium)" \
+  "$(command -v chromedriver)" \
+  "index.html"
+
 cleanup_room_host
 trap - EXIT
 
 cat build/spritely/starjunk-spritely-room.imports.json
-printf 'Spritely native + browser remote room/readiness probes passed\n'
+printf 'Spritely native + browser + packaged Godot Web bootstrap probes passed\n'
