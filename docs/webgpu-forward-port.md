@@ -57,3 +57,17 @@ The browser compatibility patch now queries the adapter limits and clamps only t
 ## Exit criteria
 
 The WebGPU build renders the torture workload correctly in supported desktop browsers, produces machine-readable benchmark results, preserves the Spritely/Game boundary, and does not require gameplay code to know it is running on an engine fork.
+
+
+### 2026-09-20 browser boot progress
+
+The storage-format promotion pass advanced the Chromium gate through device creation,
+Forward Mobile initialization, and into the GDScript boot scene. The first successful
+boot payload still reported `RenderingServer.get_current_rendering_driver_name()` as
+`"vulkan"`; that value is Godot's OS/display rendering-driver label and is not the
+active RenderingDevice backend identity for this forward-port.
+
+The permanent boot contract now checks
+`RenderingServer.get_rendering_device().get_device_api_name()`, which is implemented
+by the WebGPU driver as `"WebGpu"`. The Chromium smoke artifact is written before
+post-boot assertions so future backend-identity or profile mismatches remain inspectable.
