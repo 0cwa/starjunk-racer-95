@@ -12,13 +12,13 @@ func _init(bridge: Variant = null) -> void:
 	_bridge = bridge
 
 func is_available() -> bool:
-	var bridge := _resolve_bridge()
+	var bridge: Variant = _resolve_bridge()
 	if bridge == null:
 		return false
 	return str(bridge.controlProtocol) == RaceProtocol.CONTROL_PROTOCOL
 
 func request_join(room_reference: String, racer_id: String) -> bool:
-	var bridge := _resolve_bridge()
+	var bridge: Variant = _resolve_bridge()
 	if bridge == null or str(bridge.controlProtocol) != RaceProtocol.CONTROL_PROTOCOL:
 		return false
 	var callback_id := _allocate_callback_id()
@@ -37,13 +37,13 @@ func request_join(room_reference: String, racer_id: String) -> bool:
 	return true
 
 func release_room() -> bool:
-	var bridge := _resolve_bridge()
+	var bridge: Variant = _resolve_bridge()
 	if bridge == null or str(bridge.controlProtocol) != RaceProtocol.CONTROL_PROTOCOL:
 		return false
 	return bool(bridge.leaveRoom())
 
 func request_unready() -> bool:
-	var bridge := _resolve_bridge()
+	var bridge: Variant = _resolve_bridge()
 	if bridge == null or str(bridge.controlProtocol) != RaceProtocol.CONTROL_PROTOCOL:
 		return false
 	var callback_id := _allocate_callback_id()
@@ -62,7 +62,7 @@ func request_unready() -> bool:
 	return true
 
 func request_ready(car_content_id: String, track_content_id: String) -> bool:
-	var bridge := _resolve_bridge()
+	var bridge: Variant = _resolve_bridge()
 	if bridge == null or str(bridge.controlProtocol) != RaceProtocol.CONTROL_PROTOCOL:
 		return false
 	var callback_id := _allocate_callback_id()
