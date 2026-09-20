@@ -5,6 +5,8 @@ signal room_joined(room_id: String)
 signal room_left(room_id: String)
 signal racer_snapshot_received(peer_id: String, snapshot: Dictionary)
 signal race_event_received(event: Dictionary)
+signal race_event_published(event: Dictionary)
+signal race_event_publish_failed(event: Dictionary, reason: String)
 signal peer_joined(peer_id: String, metadata: Dictionary)
 signal peer_left(peer_id: String)
 signal content_reference_received(peer_id: String, content_reference: Dictionary)
@@ -18,7 +20,7 @@ func create_room(_options: Dictionary = {}) -> String:
 	push_error("MultiplayerAdapter.create_room is not implemented")
 	return ""
 
-func join_room(_room_reference: String) -> bool:
+func join_room(_room_reference: String, _racer_id: String = "") -> bool:
 	push_error("MultiplayerAdapter.join_room is not implemented")
 	return false
 

@@ -93,3 +93,22 @@ export async function loadSpritelyRaceBridge({
     },
   });
 }
+
+export async function installSpritelyGodotBridge(options = {}) {
+  const raceBridge = await loadSpritelyRaceBridge(options);
+  const godotBridge = Object.freeze({
+    controlProtocol: raceBridge.controlProtocol,
+    readyContentValid(carContentId, trackContentId) {
+      return raceBridge.readyContentValid(carContentId, trackContentId);
+    },
+    async joinRoom(roomReference, racerId) {
+      const joined = await raceBridge.joinRoom(roomReference, racerId);
+      return joined.roomReference;
+    },
+    async becomeReady(carContentId, trackContentId) {
+      return await raceBridge.becomeReady(carContentId, trackContentId);
+    },
+  });
+  globalThis.StarjunkSpritely = godotBridge;
+  return godotBridge;
+}

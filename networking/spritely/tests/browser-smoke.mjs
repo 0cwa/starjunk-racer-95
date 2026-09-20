@@ -1,5 +1,5 @@
 import { createGoblinsBrowserImports } from "./browser-host.mjs";
-import { loadSpritelyRaceBridge } from "./browser-race-bridge.mjs";
+import { installSpritelyGodotBridge } from "./browser-race-bridge.mjs";
 
 const status = document.getElementById("status");
 const validCar = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -19,7 +19,7 @@ try {
   }
 
   mark("loading-bridge", "loading Hoot race bridge");
-  const bridge = await loadSpritelyRaceBridge({
+  const bridge = await installSpritelyGodotBridge({
     SchemeClass: globalThis.HootScheme,
     userImports: createGoblinsBrowserImports(),
   });
@@ -27,8 +27,8 @@ try {
   if (bridge.controlProtocol !== "starjunk95/race-control/3") {
     throw new Error(`unexpected control protocol: ${bridge.controlProtocol}`);
   }
-  if (!bridge.browserCapnSupported) {
-    throw new Error("browser CapTP bootstrap is not available");
+  if (globalThis.StarjunkSpritely !== bridge) {
+    throw new Error("Godot-visible Spritely bridge was not installed globally");
   }
   if (!bridge.readyContentValid(validCar, validTrack)) {
     throw new Error("canonical ready content IDs were rejected");
@@ -38,13 +38,9 @@ try {
   }
 
   mark("joining", "joining remote Spritely room");
-  const joined = await bridge.joinRoom(roomReference, racerId);
-  if (
-    joined.state !== "joined" ||
-    joined.roomReference !== roomReference ||
-    joined.racerId !== racerId
-  ) {
-    throw new Error("browser room join returned invalid lifecycle state");
+  const joinedReference = await bridge.joinRoom(roomReference, racerId);
+  if (joinedReference !== roomReference) {
+    throw new Error("Godot-visible room join did not preserve sturdyref");
   }
 
   mark("readying", "binding racer readiness to content");
