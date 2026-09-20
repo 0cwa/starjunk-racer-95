@@ -25,18 +25,22 @@
               (spawn-mycapn netlayer)))))
   browser-mycapn)
 
-(define (await-vow vow)
+(define (await-vow vat vow)
   (define done? (make-condition))
   (define value #f)
   (define failure #f)
-  (on vow
-      (lambda (resolved)
-        (set! value resolved)
-        (signal-condition! done?))
-      #:catch
-      (lambda (err)
-        (set! failure err)
-        (signal-condition! done?)))
+  ;; Match the proven native pattern: register vow continuations in the vat
+  ;; that owns the remote reference, but wait from the outer fiber so the vat
+  ;; remains available to process the network turn that resolves the vow.
+  (with-vat vat
+    (on vow
+        (lambda (resolved)
+          (set! value resolved)
+          (signal-condition! done?))
+        #:catch
+        (lambda (err)
+          (set! failure err)
+          (signal-condition! done?))))
   (wait done?)
   (when failure
     (error "remote capability call failed" failure))
@@ -52,16 +56,16 @@
     (error "invalid racer id"))
 
   (define mycapn (make-browser-capn))
-  ;; Only create/send vows inside the vat. Waiting must happen outside the vat
-  ;; turn so the vat remains free to process network callbacks and resolve them.
   (define remote-room
     (await-vow
+     browser-vat
      (with-vat browser-vat
        (<- mycapn
            'enliven
            (string->ocapn-id room-reference)))))
   (define protocol
     (await-vow
+     browser-vat
      (with-vat browser-vat
        (<- remote-room 'protocol))))
   (unless (string=? protocol race-control-protocol)
@@ -69,6 +73,7 @@
 
   (define racer
     (await-vow
+     browser-vat
      (with-vat browser-vat
        (<- remote-room 'join racer-id))))
 
@@ -83,6 +88,7 @@
   (unless (ready-content-valid? car-content-id track-content-id)
     (error "ready content ids must be canonical sha256 identities"))
   (await-vow
+   browser-vat
    (with-vat browser-vat
      (<- browser-racer
          'ready
