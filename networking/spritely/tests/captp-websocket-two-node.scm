@@ -83,7 +83,11 @@
                         (lambda (ready?)
                           (unless ready?
                             (set! failure "remote racer ready call failed"))
-                          (signal-condition! done?))))))))))
+                          (on (<- racer 'unready)
+                              (lambda (unready?)
+                                (unless unready?
+                                  (set! failure "remote racer unready call failed"))
+                                (signal-condition! done?))))))))))))
 
 (wait done?)
 
