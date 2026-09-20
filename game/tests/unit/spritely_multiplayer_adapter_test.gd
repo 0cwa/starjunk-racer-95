@@ -136,9 +136,13 @@ func _test_leave_cancels_pending_join() -> void:
 	var bridge := FakeBridgePort.new()
 	var adapter := SpritelyMultiplayerAdapter.new(bridge)
 	var joined := PackedStringArray()
+	var left := PackedStringArray()
 	var states: Array[StringName] = []
 	adapter.room_joined.connect(func(room_id: String) -> void:
 		joined.append(room_id)
+	)
+	adapter.room_left.connect(func(room_id: String) -> void:
+		left.append(room_id)
 	)
 	adapter.connection_state_changed.connect(func(state: StringName) -> void:
 		states.append(state)
@@ -151,6 +155,7 @@ func _test_leave_cancels_pending_join() -> void:
 		not states.is_empty() and states[-1] == SpritelyMultiplayerAdapter.STATE_DISCONNECTED,
 		"cancelled pending join should surface disconnected state"
 	)
+	_check(left.is_empty(), "cancelling a pending join must not emit room_left before room_joined")
 
 	# A late browser callback must not resurrect local membership.
 	bridge.join_completed.emit(true, ROOM_REFERENCE, RACER_ID, "")
