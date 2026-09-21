@@ -425,10 +425,11 @@ static inline WGPUWaitStatus starjunk_webgpu_emdawn_wait_future(
 """,
         """\t\t\t\tdefault: {
 \t\t\t\t\tconst UniformType unsupported_type = corrected_binding.original_type;
+\t\t\t\t\tconst String unsupported_shader_name = shader_info->shader_name;
 \t\t\t\t\tmemdelete(shader_info);
 \t\t\t\t\tERR_FAIL_V_MSG(ShaderID(), vformat(
 \t\t\t\t\t\t\t"WebGpu shader %s uses unsupported uniform type %d at set %d binding %d.",
-\t\t\t\t\t\t\tshader_info->shader_name, unsupported_type, set_idx, corrected_binding.corrected_binding_idx));
+\t\t\t\t\t\t\tunsupported_shader_name, unsupported_type, set_idx, corrected_binding.corrected_binding_idx));
 \t\t\t\t}
 """,
     )
