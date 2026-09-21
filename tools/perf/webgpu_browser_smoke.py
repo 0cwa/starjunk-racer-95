@@ -263,6 +263,12 @@ def main() -> int:
     parser.add_argument("--result-global", default="__STARJUNK_PERF_RESULT__")
     parser.add_argument("--purpose", default="browser_webgpu_smoke")
     parser.add_argument("--expected-profile", default="")
+    parser.add_argument(
+        "--required-console-prefix",
+        action="append",
+        default=[],
+        help="Require an additional JSON console signal with this prefix.",
+    )
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
@@ -559,6 +565,20 @@ window.addEventListener('unhandledrejection', (event) => {
             print(json.dumps(failure_result, indent=2))
             raise TimeoutError(f"Godot WebGPU result {args.result_global!r} was not published")
 
+        required_console_results: dict[str, object] = {}
+        missing_console_prefixes: list[str] = []
+        for prefix in args.required_console_prefix:
+            required_payload = find_console_json(cdp.events, prefix)
+            if required_payload is None:
+                required_payload = wait_for_console_json(
+                    cdp, prefix, min(args.timeout, 20.0)
+                )
+            if required_payload is None:
+                missing_console_prefixes.append(prefix)
+            else:
+                required_console_results[prefix] = required_payload
+
+        browser_events = extract_browser_events(cdp.events)
         renderer = str(payload.get("renderer", "")).lower()
         driver = str(payload.get("rendering_driver", "")).lower()
         event_summary = summarize_cdp_events(cdp.events)
@@ -572,9 +592,14 @@ window.addEventListener('unhandledrejection', (event) => {
             "payload": payload,
             "cdp_events": event_summary,
             "browser_events": browser_events[-120:],
+            "required_console_results": required_console_results,
         }
 
         validation_errors: list[str] = []
+        for prefix in missing_console_prefixes:
+            validation_errors.append(
+                f"Required browser console signal {prefix!r} was not observed"
+            )
         if renderer != "mobile":
             validation_errors.append(f"Expected Mobile renderer, got {renderer!r}")
         if driver != "webgpu":
