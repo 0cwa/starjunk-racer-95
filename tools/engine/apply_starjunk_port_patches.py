@@ -97,6 +97,24 @@ static WGPUTextureFormat starjunk_webgpu_storage_format(
     )
 
     replace_once(
+        forward_mobile_implementation,
+        """\t\t//lightmaps
+\t\tscene_state.max_lightmaps = MAX_LIGHTMAPS;
+\t\tdefines += "\\n#define MAX_LIGHTMAP_TEXTURES " + itos(scene_state.max_lightmaps) + "\\n";
+""",
+        """\t\t// The bridge WebGPU shader transform expands binding arrays into one
+\t\t// binding per element. Chromium SwiftShader exposes only 16 sampled
+\t\t// textures per stage, while the normal Mobile lightmap array alone is
+\t\t// MAX_LIGHTMAPS * 2 (lightmap + shadowmask). Keep one active lightmap
+\t\t// on this bridge path until the polished backend's binding-array
+\t\t// flattening is forward-ported.
+\t\tscene_state.max_lightmaps =
+\t\t\t\tRD::get_singleton()->get_device_capabilities().device_family == RDD::DEVICE_WEBGPU ? 1 : MAX_LIGHTMAPS;
+\t\tdefines += "\\n#define MAX_LIGHTMAP_TEXTURES " + itos(scene_state.max_lightmaps) + "\\n";
+""",
+    )
+
+    replace_once(
         main_implementation,
         """		GLOBAL_DEF_RST(PropertyInfo(Variant::STRING, "rendering/rendering_device/driver.macos", PROPERTY_HINT_ENUM, "metal,vulkan"), "metal");
 
@@ -394,6 +412,24 @@ static inline WGPUWaitStatus starjunk_webgpu_emdawn_wait_future(
 #else
 		shader_info->shader_contents.push_back(String((const char *)decompressed_code.ptr()));
 #endif
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """\t\t\t\tdefault: {
+\t\t\t\t\tmemdelete(shader_info);
+\t\t\t\t\tDEV_ASSERT(false);
+\t\t\t\t\treturn ShaderID();
+\t\t\t\t}
+""",
+        """\t\t\t\tdefault: {
+\t\t\t\t\tconst UniformType unsupported_type = corrected_binding.original_type;
+\t\t\t\t\tmemdelete(shader_info);
+\t\t\t\t\tERR_FAIL_V_MSG(ShaderID(), vformat(
+\t\t\t\t\t\t\t"WebGpu shader %s uses unsupported uniform type %d at set %d binding %d.",
+\t\t\t\t\t\t\tshader_info->shader_name, unsupported_type, set_idx, corrected_binding.corrected_binding_idx));
+\t\t\t\t}
 """,
     )
 
