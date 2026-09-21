@@ -112,6 +112,7 @@ def summarize_cdp_events(events: list[dict]) -> dict:
     exceptions: list[dict] = []
     network_failures: list[dict] = []
     log_entries: list[dict] = []
+    renderer_errors: list[str] = []
 
     for event in events[-500:]:
         method = event.get("method")
@@ -120,11 +121,17 @@ def summarize_cdp_events(events: list[dict]) -> dict:
             values = []
             for arg in params.get("args", [])[:12]:
                 values.append(arg.get("value", arg.get("description", arg.get("type", ""))))
+            console_type = params.get("type", "")
             console.append({
-                "type": params.get("type", ""),
+                "type": console_type,
                 "values": values,
                 "timestamp": params.get("timestamp"),
             })
+            if console_type == "error":
+                for value in values:
+                    message = str(value)
+                    if message and message not in renderer_errors:
+                        renderer_errors.append(message)
         elif method == "Runtime.exceptionThrown":
             details = params.get("exceptionDetails", {})
             exception = details.get("exception", {})
@@ -145,19 +152,27 @@ def summarize_cdp_events(events: list[dict]) -> dict:
             })
         elif method == "Log.entryAdded":
             entry = params.get("entry", {})
-            log_entries.append({
+            log_entry = {
                 "source": entry.get("source", ""),
                 "level": entry.get("level", ""),
                 "text": entry.get("text", ""),
                 "url": entry.get("url", ""),
                 "line": entry.get("lineNumber"),
-            })
+            }
+            log_entries.append(log_entry)
+            if log_entry["source"] == "rendering" and log_entry["level"] in ("error", "warning"):
+                message = str(log_entry["text"])
+                if message and message not in renderer_errors:
+                    renderer_errors.append(message)
 
     return {
         "console": console[-120:],
+        "console_first": console[:40],
         "exceptions": exceptions[-80:],
         "network_failures": network_failures[-80:],
         "log_entries": log_entries[-120:],
+        "log_entries_first": log_entries[:40],
+        "renderer_errors": renderer_errors[:80],
     }
 
 
@@ -411,13 +426,7 @@ window.addEventListener('unhandledrejection', (event) => {
                 f"Expected Web rendering driver label 'webgpu', got {driver!r}"
             )
 
-        renderer_errors: list[str] = []
-        for event in event_summary.get("console", []):
-            for value in event.get("values", []):
-                message = str(value)
-                if "ERROR:" in message or "[WEBGPU] error:" in message:
-                    if message not in renderer_errors:
-                        renderer_errors.append(message)
+        renderer_errors = event_summary.get("renderer_errors", [])
         if renderer_errors:
             validation_errors.append(
                 "Renderer validation errors observed: " + " | ".join(renderer_errors[:3])
