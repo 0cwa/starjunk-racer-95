@@ -51,6 +51,8 @@ jobs:
         run: 'timeout 45s "$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/road_surface_vehicle_test.tscn'
       - name: Run playable prototype race integration test
         run: 'timeout 45s "$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/prototype_race_test.tscn'
+      - name: Run playable browser harness scene
+        run: 'timeout 30s "$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/web_playable_smoke.tscn'
       - name: Run vehicle telemetry accumulator tests
         run: '"$GODOT_BIN" --headless --path game res://tests/unit/vehicle_telemetry_accumulator_test.tscn'
       - name: Characterize prototype vehicle
