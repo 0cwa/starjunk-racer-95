@@ -275,6 +275,88 @@ static inline WGPUWaitStatus starjunk_webgpu_emdawn_wait_future(
 
     replace_once(
         device_implementation,
+        """BitField<RenderingDeviceDriver::TextureUsageBits> RenderingDeviceDriverWebGpu::texture_get_usages_supported_by_format(DataFormat p_format, bool p_cpu_readable) {
+	for (WGPUTextureFormat format : WEBGPU_CORE_SUPPORTED_FORMATS) {
+		if (webgpu_texture_format_from_rd(p_format) == format) {
+			// TODO: Read this https://www.w3.org/TR/webgpu/#texture-format-caps
+			BitField<RDD::TextureUsageBits> supported = INT64_MAX;
+			return supported;
+		}
+	}
+
+	return 0;
+}
+""",
+        """BitField<RenderingDeviceDriver::TextureUsageBits> RenderingDeviceDriverWebGpu::texture_get_usages_supported_by_format(DataFormat p_format, bool p_cpu_readable) {
+	for (WGPUTextureFormat format : WEBGPU_CORE_SUPPORTED_FORMATS) {
+		if (webgpu_texture_format_from_rd(p_format) == format) {
+			BitField<RDD::TextureUsageBits> supported = INT64_MAX;
+#if defined(WEBGPU_BACKEND_EMDAWN)
+			// The bridge implementation used to claim every core WebGPU format
+			// supported every texture usage. Forward Mobile relies on this query
+			// to choose its raster fallbacks. In particular, A2B10G10R10 is a
+			// color target on WebGPU but not a storage texture, so claiming storage
+			// support incorrectly enables the octmap compute path and produces
+			// invalid RGB10A2 storage bindings in Chromium.
+			bool storage_supported = false;
+			switch (p_format) {
+				case DATA_FORMAT_R8_UNORM:
+				case DATA_FORMAT_R8_SNORM:
+				case DATA_FORMAT_R8_UINT:
+				case DATA_FORMAT_R8_SINT:
+				case DATA_FORMAT_R8G8_UNORM:
+				case DATA_FORMAT_R8G8_SNORM:
+				case DATA_FORMAT_R8G8_UINT:
+				case DATA_FORMAT_R8G8_SINT:
+				case DATA_FORMAT_R8G8B8A8_UNORM:
+				case DATA_FORMAT_R8G8B8A8_SNORM:
+				case DATA_FORMAT_R8G8B8A8_UINT:
+				case DATA_FORMAT_R8G8B8A8_SINT:
+				case DATA_FORMAT_R16_UNORM:
+				case DATA_FORMAT_R16_SNORM:
+				case DATA_FORMAT_R16_SFLOAT:
+				case DATA_FORMAT_R16_UINT:
+				case DATA_FORMAT_R16_SINT:
+				case DATA_FORMAT_R16G16_UNORM:
+				case DATA_FORMAT_R16G16_SNORM:
+				case DATA_FORMAT_R16G16_SFLOAT:
+				case DATA_FORMAT_R16G16_UINT:
+				case DATA_FORMAT_R16G16_SINT:
+				case DATA_FORMAT_R16G16B16A16_UNORM:
+				case DATA_FORMAT_R16G16B16A16_SNORM:
+				case DATA_FORMAT_R16G16B16A16_SFLOAT:
+				case DATA_FORMAT_R16G16B16A16_UINT:
+				case DATA_FORMAT_R16G16B16A16_SINT:
+				case DATA_FORMAT_R32_SFLOAT:
+				case DATA_FORMAT_R32_UINT:
+				case DATA_FORMAT_R32_SINT:
+				case DATA_FORMAT_R32G32_SFLOAT:
+				case DATA_FORMAT_R32G32_UINT:
+				case DATA_FORMAT_R32G32_SINT:
+				case DATA_FORMAT_R32G32B32A32_SFLOAT:
+				case DATA_FORMAT_R32G32B32A32_UINT:
+				case DATA_FORMAT_R32G32B32A32_SINT:
+					storage_supported = true;
+					break;
+				default:
+					break;
+			}
+			if (!storage_supported) {
+				supported.clear_flag(TEXTURE_USAGE_STORAGE_BIT);
+				supported.clear_flag(TEXTURE_USAGE_STORAGE_ATOMIC_BIT);
+			}
+#endif
+			return supported;
+		}
+	}
+
+	return 0;
+}
+""",
+    )
+
+    replace_once(
+        device_implementation,
         """	WGPUTextureFormat texture_format = webgpu_texture_format_from_rd(p_format.format);
 	WGPUTextureFormat view_format = webgpu_texture_format_from_rd(p_view.format);
 	WGPUTextureUsage usage = (WGPUTextureUsage)usage_bits;
@@ -357,7 +439,7 @@ static inline WGPUWaitStatus starjunk_webgpu_emdawn_wait_future(
 		String starjunk_wgsl;
 		CharString starjunk_wgsl_utf8;
 #if defined(WEBGPU_BACKEND_EMDAWN)
-		starjunk_wgsl = String((const char *)decompressed_code.ptr());
+		starjunk_wgsl = String::utf8((const char *)decompressed_code.ptr(), source_size);
 		const bool has_texture_formats_tier1 =
 				wgpuDeviceHasFeature(device, WGPUFeatureName_TextureFormatsTier1);
 		if (!has_texture_formats_tier1) {
