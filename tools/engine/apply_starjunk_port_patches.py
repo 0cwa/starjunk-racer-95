@@ -26,6 +26,7 @@ def main() -> None:
 
     header = source / "drivers/webgpu/rendering_device_driver_webgpu.h"
     device_implementation = source / "drivers/webgpu/rendering_device_driver_webgpu.cpp"
+    shader_container_implementation = source / "drivers/webgpu/rendering_shader_container_webgpu.cpp"
     context_implementation = source / "drivers/webgpu/rendering_context_driver_webgpu.cpp"
     platform_header = source / "drivers/webgpu/webgpu_platform.h"
     main_implementation = source / "main/main.cpp"
@@ -209,6 +210,28 @@ static inline WGPUWaitStatus starjunk_webgpu_emdawn_wait_future(
 }
 #endif
 
+#endif
+""",
+    )
+
+    replace_once(
+        shader_container_implementation,
+        """static const char WEBGPU_WGSL_PRELUDE[] =
+\t\t"enable subgroups;\\n"
+\t\t"diagnostic(off, derivative_uniformity);\\n"
+\t\t"diagnostic(off, subgroup_uniformity);\\n";
+""",
+        """#if defined(WEBGPU_BACKEND_DAWN_DESKTOP)
+static const char WEBGPU_WGSL_PRELUDE[] =
+\t\t"enable subgroups;\\n"
+\t\t"diagnostic(off, derivative_uniformity);\\n"
+\t\t"diagnostic(off, subgroup_uniformity);\\n";
+#else
+// Browser WebGPU only permits the subgroups WGSL extension when the device
+// explicitly enables the corresponding adapter feature. The Emdawn path does
+// not request that optional feature, so do not make every shader depend on it.
+static const char WEBGPU_WGSL_PRELUDE[] =
+\t\t"diagnostic(off, derivative_uniformity);\\n";
 #endif
 """,
     )
