@@ -839,6 +839,57 @@ static const char WEBGPU_WGSL_PRELUDE[] =
 """,
     )
 
+    # Surface capability formats are ordered by preference. The bridge used to
+    # keep overwriting its selection and therefore picked the last supported
+    # format, which forces Chromium/Emdawn to insert an avoidable canvas copy.
+    replace_once(
+        context_implementation,
+        """\t// Godot only supports these swapchain formats.
+\tfor (uint32_t i = 0; i < capabilities.formatCount; i++) {
+\t\tWGPUTextureFormat format = capabilities.formats[i];
+\t\tswitch (format) {
+\t\t\tcase WGPUTextureFormat_BGRA8Unorm:
+\t\t\t\tthis->format = format;
+\t\t\t\tthis->rd_format = RDD::DATA_FORMAT_B8G8R8A8_UNORM;
+\t\t\t\tbreak;
+\t\t\tcase WGPUTextureFormat_RGBA8Unorm:
+\t\t\t\tthis->format = format;
+\t\t\t\tthis->rd_format = RDD::DATA_FORMAT_R8G8B8A8_UNORM;
+\t\t\t\tbreak;
+\t\t\tdefault:
+\t\t\t\tbreak;
+\t\t}
+\t}
+
+\t// TODO: Complete full surface config.
+""",
+        """\t// Surface formats are ordered by preference. Select the first format
+\t// Godot supports instead of accidentally retaining the last one.
+\tbool found_surface_format = false;
+\tfor (uint32_t i = 0; i < capabilities.formatCount && !found_surface_format; i++) {
+\t\tWGPUTextureFormat format = capabilities.formats[i];
+\t\tswitch (format) {
+\t\t\tcase WGPUTextureFormat_BGRA8Unorm:
+\t\t\t\tthis->format = format;
+\t\t\t\tthis->rd_format = RDD::DATA_FORMAT_B8G8R8A8_UNORM;
+\t\t\t\tfound_surface_format = true;
+\t\t\t\tbreak;
+\t\t\tcase WGPUTextureFormat_RGBA8Unorm:
+\t\t\t\tthis->format = format;
+\t\t\t\tthis->rd_format = RDD::DATA_FORMAT_R8G8B8A8_UNORM;
+\t\t\t\tfound_surface_format = true;
+\t\t\t\tbreak;
+\t\t\tdefault:
+\t\t\t\tbreak;
+\t\t}
+\t}
+\twgpuSurfaceCapabilitiesFreeMembers(capabilities);
+\tERR_FAIL_COND_MSG(!found_surface_format, "WebGPU surface exposes no Godot-supported color format.");
+
+\t// TODO: Complete full surface config.
+""",
+    )
+
     print("Applied Starjunk WebGPU 4.7 compatibility patches")
 
 
