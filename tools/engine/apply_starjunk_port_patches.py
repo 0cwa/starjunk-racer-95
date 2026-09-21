@@ -298,6 +298,58 @@ static const char WEBGPU_WGSL_PRELUDE[] =
 
     replace_once(
         device_implementation,
+        """uint64_t RenderingDeviceDriverWebGpu::limit_get(Limit p_limit) {
+\tWGPULimits limits = (WGPULimits){};
+
+#ifdef WEBGPU_BACKEND_WGPU_DESKTOP
+\tWGPUNativeLimits extras;
+\tlimits.nextInChain = &extras.chain;
+#endif
+
+\twgpuDeviceGetLimits(device, &limits);
+\treturn rd_limit_from_webgpu(p_limit, limits);
+}
+""",
+        """uint64_t RenderingDeviceDriverWebGpu::limit_get(Limit p_limit) {
+\tWGPULimits limits = (WGPULimits){};
+
+#ifdef WEBGPU_BACKEND_WGPU_DESKTOP
+\tWGPUNativeLimits extras;
+\tlimits.nextInChain = &extras.chain;
+#endif
+
+\twgpuDeviceGetLimits(device, &limits);
+#if defined(WEBGPU_BACKEND_EMDAWN)
+\t// Browser WebGPU must expose the limits of the device we actually
+\t// requested, not the bridge's historical UINT64_MAX placeholders.
+\t// Renderer feature selection relies on these values to avoid generating
+\t// resource layouts the adapter cannot validate.
+\tswitch (p_limit) {
+\t\tcase LIMIT_MAX_TEXTURES_PER_UNIFORM_SET:
+\t\t\treturn limits.maxSampledTexturesPerShaderStage;
+\t\tcase LIMIT_MAX_SAMPLERS_PER_UNIFORM_SET:
+\t\t\treturn limits.maxSamplersPerShaderStage;
+\t\tcase LIMIT_MAX_STORAGE_BUFFERS_PER_UNIFORM_SET:
+\t\t\treturn limits.maxStorageBuffersPerShaderStage;
+\t\tcase LIMIT_MAX_STORAGE_IMAGES_PER_UNIFORM_SET:
+\t\t\treturn limits.maxStorageTexturesPerShaderStage;
+\t\tcase LIMIT_SUBGROUP_SIZE:
+\t\tcase LIMIT_SUBGROUP_MIN_SIZE:
+\t\tcase LIMIT_SUBGROUP_MAX_SIZE:
+\t\tcase LIMIT_SUBGROUP_IN_SHADERS:
+\t\tcase LIMIT_SUBGROUP_OPERATIONS:
+\t\t\treturn 0;
+\t\tdefault:
+\t\t\tbreak;
+\t}
+#endif
+\treturn rd_limit_from_webgpu(p_limit, limits);
+}
+""",
+    )
+
+    replace_once(
+        device_implementation,
         """BitField<RenderingDeviceDriver::TextureUsageBits> RenderingDeviceDriverWebGpu::texture_get_usages_supported_by_format(DataFormat p_format, bool p_cpu_readable) {
 	for (WGPUTextureFormat format : WEBGPU_CORE_SUPPORTED_FORMATS) {
 		if (webgpu_texture_format_from_rd(p_format) == format) {
