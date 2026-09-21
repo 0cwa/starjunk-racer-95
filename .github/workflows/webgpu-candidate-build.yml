@@ -9,6 +9,10 @@ on:
       - "tools/perf/webgpu_browser_smoke.py"
       - "game/export_presets.cfg"
       - "game/tests/perf/webgpu_boot/**"
+      - "game/tests/integration/web_playable_smoke.gd"
+      - "game/tests/integration/web_playable_smoke.tscn"
+      - "networking/spritely/**"
+      - "tools/networking/package_spritely_web.sh"
       - ".github/workflows/webgpu-candidate-build.yml"
   pull_request:
     paths:
@@ -17,6 +21,10 @@ on:
       - "tools/perf/webgpu_browser_smoke.py"
       - "game/export_presets.cfg"
       - "game/tests/perf/webgpu_boot/**"
+      - "game/tests/integration/web_playable_smoke.gd"
+      - "game/tests/integration/web_playable_smoke.tscn"
+      - "networking/spritely/**"
+      - "tools/networking/package_spritely_web.sh"
       - ".github/workflows/webgpu-candidate-build.yml"
   workflow_dispatch:
 
@@ -27,7 +35,7 @@ concurrency:
 jobs:
   web-template:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       EM_VERSION: "6.0.9"
       SCONS_CACHE: ${{ github.workspace }}/.cache/scons-godot-webgpu
@@ -122,3 +130,61 @@ jobs:
           name: webgpu-browser-boot
           path: build/webgpu-boot-smoke.json
           if-no-files-found: warn
+      - name: Build and validate pinned Spritely Web runtime
+        run: networking/spritely/run_spike.sh
+      - name: Export real PrototypeRace browser smoke
+        run: |
+          tools/engine/export_webgpu_playable.sh \
+            "$GODOT_BIN" \
+            "$GITHUB_WORKSPACE/build/webgpu-port-candidate/godot/bin/godot.web.template_release.wasm32.nothreads.zip" \
+            "$GITHUB_WORKSPACE/build/webgpu-playable-smoke" \
+            "res://tests/integration/web_playable_smoke.tscn"
+          tools/networking/package_spritely_web.sh "$GITHUB_WORKSPACE/build/webgpu-playable-smoke"
+          (
+            cd "$GITHUB_WORKSPACE/build/webgpu-playable-smoke/spritely"
+            sha256sum -c SHA256SUMS
+          )
+      - name: Run Chromium playable + Spritely gate
+        run: |
+          python3 tools/perf/webgpu_browser_smoke.py \
+            --root build/webgpu-playable-smoke \
+            --output build/webgpu-playable-smoke.json \
+            --result-global __STARJUNK_PLAYABLE_RESULT__ \
+            --purpose browser_webgpu_playable \
+            --expected-profile playable \
+            --required-console-prefix STARJUNK_SPRITELY_READY_JSON: \
+            --timeout 60
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          result = json.loads(Path("build/webgpu-playable-smoke.json").read_text())
+          payload = result.get("payload", {})
+          if payload.get("vehicle_ready") is not True:
+              raise SystemExit(f"PrototypeRace vehicle was not ready: {payload}")
+          if int(payload.get("checkpoint_count", 0)) < 2:
+              raise SystemExit(f"PrototypeRace checkpoints were not built: {payload}")
+          print(json.dumps(payload, indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: webgpu-browser-playable-smoke
+          path: build/webgpu-playable-smoke.json
+          if-no-files-found: warn
+      - name: Export shareable PrototypeRace browser demo
+        run: |
+          tools/engine/export_webgpu_playable.sh \
+            "$GODOT_BIN" \
+            "$GITHUB_WORKSPACE/build/webgpu-port-candidate/godot/bin/godot.web.template_release.wasm32.nothreads.zip" \
+            "$GITHUB_WORKSPACE/build/web-demo"
+          tools/networking/package_spritely_web.sh "$GITHUB_WORKSPACE/build/web-demo"
+          (
+            cd "$GITHUB_WORKSPACE/build/web-demo/spritely"
+            sha256sum -c SHA256SUMS
+          )
+      - uses: actions/upload-artifact@v4
+        with:
+          name: starjunk-racer-95-browser-demo
+          path: build/web-demo/
+          if-no-files-found: error
