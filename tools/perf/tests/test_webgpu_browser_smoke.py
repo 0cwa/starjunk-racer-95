@@ -2,6 +2,7 @@ import json
 import unittest
 
 from tools.perf.webgpu_browser_smoke import (
+    RESULT_CONSOLE_PREFIXES,
     WEBGPU_EVENT_CONSOLE_PREFIX,
     console_json_from_event,
     extract_browser_events,
@@ -20,6 +21,12 @@ def console_event(value: str) -> dict:
 
 
 class WebGPUBrowserSmokeParsingTests(unittest.TestCase):
+    def test_playable_result_prefix_is_registered(self):
+        self.assertEqual(
+            RESULT_CONSOLE_PREFIXES["__STARJUNK_PLAYABLE_RESULT__"],
+            "STARJUNK_PLAYABLE_JSON:",
+        )
+
     def test_finds_structured_boot_result_from_console(self):
         payload = {
             "profile": "boot",
