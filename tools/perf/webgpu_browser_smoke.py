@@ -14,7 +14,6 @@ import threading
 import time
 import urllib.request
 
-import websocket
 
 
 class BenchmarkHandler(http.server.SimpleHTTPRequestHandler):
@@ -44,7 +43,10 @@ def find_chrome() -> str:
 
 class CDP:
     def __init__(self, url: str) -> None:
-        self.ws = websocket.create_connection(url, timeout=5)
+        import websocket as websocket_client
+
+        self.websocket = websocket_client
+        self.ws = websocket_client.create_connection(url, timeout=5)
         self.next_id = 1
         self.events: list[dict] = []
 
@@ -59,13 +61,25 @@ class CDP:
         while time.monotonic() < deadline:
             remaining = max(0.1, deadline - time.monotonic())
             self.ws.settimeout(remaining)
-            message = json.loads(self.ws.recv())
+            try:
+                message = json.loads(self.ws.recv())
+            except self.websocket.WebSocketTimeoutException:
+                break
             if message.get("id") == call_id:
                 if "error" in message:
                     raise RuntimeError(f"CDP {method} failed: {message['error']}")
                 return message.get("result", {})
             self.events.append(message)
         raise TimeoutError(f"Timed out waiting for CDP {method}")
+
+    def receive_event(self, timeout: float = 0.5) -> dict | None:
+        self.ws.settimeout(max(0.05, timeout))
+        try:
+            message = json.loads(self.ws.recv())
+        except self.websocket.WebSocketTimeoutException:
+            return None
+        self.events.append(message)
+        return message
 
     def evaluate(self, expression: str, await_promise: bool = False, timeout: float = 15.0):
         result = self.call(
@@ -97,6 +111,70 @@ def wait_for_page(debug_port: int, timeout: float) -> str:
             pass
         time.sleep(0.25)
     raise TimeoutError("Chromium DevTools page target did not appear")
+
+
+WEBGPU_EVENT_CONSOLE_PREFIX = "STARJUNK_WEBGPU_EVENT_JSON:"
+RESULT_CONSOLE_PREFIXES = {
+    "__STARJUNK_BOOT_RESULT__": "STARJUNK_WEBGPU_BOOT_JSON:",
+    "__STARJUNK_PERF_RESULT__": "STARJUNK_PERF_JSON:",
+}
+
+
+def console_values(event: dict) -> list[object]:
+    if event.get("method") != "Runtime.consoleAPICalled":
+        return []
+    values: list[object] = []
+    for arg in event.get("params", {}).get("args", [])[:12]:
+        values.append(arg.get("value", arg.get("description", arg.get("type", ""))))
+    return values
+
+
+def console_json_from_event(event: dict, prefix: str):
+    for value in console_values(event):
+        if not isinstance(value, str) or not value.startswith(prefix):
+            continue
+        encoded = value[len(prefix):].strip()
+        if not encoded:
+            continue
+        try:
+            return json.loads(encoded)
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
+def find_console_json(events: list[dict], prefix: str):
+    for event in reversed(events):
+        payload = console_json_from_event(event, prefix)
+        if payload is not None:
+            return payload
+    return None
+
+
+def wait_for_console_json(cdp: CDP, prefix: str, timeout: float):
+    payload = find_console_json(cdp.events, prefix)
+    if payload is not None:
+        return payload
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        remaining = max(0.05, min(0.5, deadline - time.monotonic()))
+        event = cdp.receive_event(remaining)
+        if event is None:
+            continue
+        payload = console_json_from_event(event, prefix)
+        if payload is not None:
+            return payload
+    return None
+
+
+def extract_browser_events(events: list[dict]) -> list[dict]:
+    parsed: list[dict] = []
+    for event in events:
+        payload = console_json_from_event(event, WEBGPU_EVENT_CONSOLE_PREFIX)
+        if isinstance(payload, dict):
+            parsed.append(payload)
+    return parsed
 
 
 def tail_text(path: Path, limit: int = 12000) -> str:
@@ -257,10 +335,12 @@ window.__STARJUNK_BROWSER_EVENTS__ = [];
 (() => {
     const pushWebGPUEvent = (kind, detail) => {
         try {
-            window.__STARJUNK_BROWSER_EVENTS__.push({
+            const payload = {
                 type: kind,
                 ...detail
-            });
+            };
+            window.__STARJUNK_BROWSER_EVENTS__.push(payload);
+            console.log('STARJUNK_WEBGPU_EVENT_JSON:' + JSON.stringify(payload));
         } catch (_) {}
     };
 
@@ -429,67 +509,49 @@ window.addEventListener('unhandledrejection', (event) => {
         if not adapter_probe or not adapter_probe.get("adapter"):
             raise RuntimeError(f"WebGPU adapter unavailable: {adapter_probe}")
 
-        deadline = time.monotonic() + args.timeout
+        result_console_prefix = RESULT_CONSOLE_PREFIXES.get(args.result_global, "")
         payload = None
-        result_expression = f"window[{json.dumps(args.result_global)}] || null"
-        while time.monotonic() < deadline:
-            payload = cdp.evaluate(result_expression)
-            if payload is not None:
-                break
-            time.sleep(0.5)
+        if result_console_prefix:
+            # Once Godot's Wasm main loop starts, Runtime.evaluate can be delayed
+            # indefinitely by a busy browser main thread. The benchmark scenes
+            # already print structured JSON, so consume that console event
+            # directly instead of polling JavaScript state.
+            payload = wait_for_console_json(cdp, result_console_prefix, args.timeout)
+        else:
+            deadline = time.monotonic() + args.timeout
+            result_expression = f"window[{json.dumps(args.result_global)}] || null"
+            while time.monotonic() < deadline:
+                try:
+                    payload = cdp.evaluate(result_expression, timeout=2.0)
+                except TimeoutError:
+                    payload = None
+                if payload is not None:
+                    break
+                time.sleep(0.5)
 
+        browser_events = extract_browser_events(cdp.events)
         if payload is None:
-            diagnostics = cdp.evaluate("""({
-                ready_state: document.readyState,
-                title: document.title,
-                location: location.href,
-                body_text: (document.body && document.body.innerText || "").slice(0, 4000),
-                body_html: (document.body && document.body.innerHTML || "").slice(0, 12000),
-                engine_type: typeof Engine,
-                godot_type: typeof Godot,
-                godot_config: (typeof GODOT_CONFIG !== 'undefined') ? GODOT_CONFIG : null,
-                cross_origin_isolated: self.crossOriginIsolated,
-                secure_context: self.isSecureContext,
-                starjunk_globals: Object.keys(window).filter(k => k.includes("STARJUNK")).sort(),
-                canvas: Array.from(document.querySelectorAll('canvas')).map(c => ({
-                    id: c.id, width: c.width, height: c.height,
-                    client_width: c.clientWidth, client_height: c.clientHeight
-                })),
-                status: (() => {
-                    const root = document.getElementById('status');
-                    const notice = document.getElementById('status-notice');
-                    const progress = document.getElementById('status-progress');
-                    return {
-                        exists: !!root,
-                        visibility: root ? getComputedStyle(root).visibility : '',
-                        notice_text: notice ? notice.innerText : '',
-                        notice_display: notice ? getComputedStyle(notice).display : '',
-                        progress_display: progress ? getComputedStyle(progress).display : ''
-                    };
-                })(),
-                scripts: Array.from(document.scripts).map(s => s.src || '[inline]'),
-                resources: performance.getEntriesByType('resource').map(r => ({
-                    name: r.name,
-                    initiator_type: r.initiatorType,
-                    duration_ms: r.duration,
-                    transfer_size: r.transferSize,
-                    decoded_body_size: r.decodedBodySize
-                })).slice(-80),
-                browser_events: window.__STARJUNK_BROWSER_EVENTS__ || []
-            })""")
             stdout_handle.flush()
             stderr_handle.flush()
             failure_result = {
-                "schema_version": 2,
+                "schema_version": 3,
                 "authoritative_performance": False,
                 "purpose": args.purpose,
                 "browser": Path(chrome).name,
                 "adapter_probe": adapter_probe,
-                "diagnostics": diagnostics,
+                "diagnostics": {
+                    "result_global": args.result_global,
+                    "result_console_prefix": result_console_prefix,
+                    "browser_events": browser_events[-120:],
+                },
                 "cdp_events": summarize_cdp_events(cdp.events),
                 "chromium_stdout_tail": tail_text(stdout_path),
                 "chromium_stderr_tail": tail_text(stderr_path),
-                "error": f"Timed out waiting for window.{args.result_global}",
+                "error": (
+                    f"Timed out waiting for console result {result_console_prefix!r}"
+                    if result_console_prefix
+                    else f"Timed out waiting for window.{args.result_global}"
+                ),
             }
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_text(json.dumps(failure_result, indent=2) + "\n", encoding="utf-8")
@@ -499,10 +561,9 @@ window.addEventListener('unhandledrejection', (event) => {
         renderer = str(payload.get("renderer", "")).lower()
         driver = str(payload.get("rendering_driver", "")).lower()
         event_summary = summarize_cdp_events(cdp.events)
-        browser_events = cdp.evaluate("window.__STARJUNK_BROWSER_EVENTS__ || []") or []
 
         result = {
-            "schema_version": 2,
+            "schema_version": 3,
             "authoritative_performance": False,
             "purpose": args.purpose,
             "browser": Path(chrome).name,
