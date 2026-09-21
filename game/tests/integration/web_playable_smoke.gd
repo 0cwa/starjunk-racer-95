@@ -6,7 +6,11 @@ var _race: PrototypeRace
 var _frames := 0
 
 func _ready() -> void:
-	var packed: PackedScene = load("res://src/race/prototype_race.tscn")
+	var packed := load("res://src/race/prototype_race.tscn") as PackedScene
+	if packed == null:
+		push_error("Unable to load PrototypeRace scene for browser playable smoke")
+		get_tree().quit(1)
+		return
 	_race = packed.instantiate() as PrototypeRace
 	if _race == null:
 		push_error("Unable to instantiate PrototypeRace for browser playable smoke")
