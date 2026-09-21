@@ -20,6 +20,10 @@ on:
       - ".github/workflows/webgpu-candidate-build.yml"
   workflow_dispatch:
 
+concurrency:
+  group: webgpu-candidate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   web-template:
     runs-on: ubuntu-24.04
@@ -30,6 +34,12 @@ jobs:
       STARJUNK_CARGO_TARGET_ROOT: ${{ github.workspace }}/.cache/cargo-webgpu
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact source revision
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Restore WebGPU build caches
         uses: actions/cache@v4
         with:
