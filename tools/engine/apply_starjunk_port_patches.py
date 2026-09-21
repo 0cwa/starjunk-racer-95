@@ -692,6 +692,153 @@ static const char WEBGPU_WGSL_PRELUDE[] =
 """,
     )
 
+
+    # The legacy bridge intentionally refused CubeToDp even though the shader
+    # is a regular cubemap sample + fragment-depth pass. The polished WebGPU
+    # reference has no such exclusion, and refusing it leaves Mobile with a
+    # permanently null pipeline.
+    replace_once(
+        shader_container_implementation,
+        """\t\t"BokehDofRasterShaderRD:0",
+\t\t"CubeToDpShaderRD:0",
+
+\t\t// HACK: Requires vertex writable storage.
+""",
+        """\t\t"BokehDofRasterShaderRD:0",
+
+\t\t// HACK: Requires vertex writable storage.
+""",
+    )
+
+    # Browser WebGPU exposes texture-component-swizzle as an optional feature.
+    # Keep the browser device portable by requesting it only when advertised.
+    replace_once(
+        device_implementation,
+        """\tWGPULimits required_limits = WGPU_LIMITS_INIT;
+""",
+        """#if defined(WEBGPU_BACKEND_EMDAWN)
+\tVector<WGPUFeatureName> starjunk_required_features;
+\tfor (WGPUFeatureName feature : required_features) {
+\t\tstarjunk_required_features.push_back(feature);
+\t}
+\tif (wgpuAdapterHasFeature(adapter, WGPUFeatureName_TextureComponentSwizzle)) {
+\t\tstarjunk_required_features.push_back(WGPUFeatureName_TextureComponentSwizzle);
+\t}
+#endif
+
+\tWGPULimits required_limits = WGPU_LIMITS_INIT;
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """\tWGPUDeviceDescriptor device_desc = (WGPUDeviceDescriptor){
+\t\t.requiredFeatureCount = sizeof(required_features) / sizeof(WGPUFeatureName),
+\t\t.requiredFeatures = required_features,
+\t\t.requiredLimits = &required_limits,
+""",
+        """\tWGPUDeviceDescriptor device_desc = (WGPUDeviceDescriptor){
+#if defined(WEBGPU_BACKEND_EMDAWN)
+\t\t.requiredFeatureCount = starjunk_required_features.size(),
+\t\t.requiredFeatures = starjunk_required_features.ptr(),
+#else
+\t\t.requiredFeatureCount = sizeof(required_features) / sizeof(WGPUFeatureName),
+\t\t.requiredFeatures = required_features,
+#endif
+\t\t.requiredLimits = &required_limits,
+""",
+    )
+
+    # The bridge chained the optional swizzle descriptor onto every view,
+    # including identity RGBA render targets. Only chain it when the feature
+    # was enabled. If a browser lacks the feature, identity views remain valid
+    # while a genuinely swizzled view fails explicitly rather than rendering
+    # incorrect channels.
+    replace_once(
+        device_implementation,
+        """\tWGPUTextureViewDescriptor texture_view_desc = (WGPUTextureViewDescriptor){
+\t\t.nextInChain = (WGPUChainedStruct *)&texture_view_desc_extras,
+\t\t.format = view_format,
+\t\t.dimension = view_dimension,
+""",
+        """\tWGPUChainedStruct *starjunk_texture_view_next = (WGPUChainedStruct *)&texture_view_desc_extras;
+#if defined(WEBGPU_BACKEND_EMDAWN)
+\tif (!wgpuDeviceHasFeature(device, WGPUFeatureName_TextureComponentSwizzle)) {
+\t\tconst bool identity_swizzle =
+\t\t\t\tp_view.swizzle_r == TEXTURE_SWIZZLE_R &&
+\t\t\t\tp_view.swizzle_g == TEXTURE_SWIZZLE_G &&
+\t\t\t\tp_view.swizzle_b == TEXTURE_SWIZZLE_B &&
+\t\t\t\tp_view.swizzle_a == TEXTURE_SWIZZLE_A;
+\t\tERR_FAIL_COND_V_MSG(!identity_swizzle, TextureID(),
+\t\t\t\t"Browser WebGPU adapter does not support required texture component swizzle.");
+\t\tstarjunk_texture_view_next = nullptr;
+\t}
+#endif
+\tWGPUTextureViewDescriptor texture_view_desc = (WGPUTextureViewDescriptor){
+\t\t.nextInChain = starjunk_texture_view_next,
+\t\t.format = view_format,
+\t\t.dimension = view_dimension,
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """\tWGPUTextureViewDescriptor texture_view_desc = (WGPUTextureViewDescriptor){
+\t\t.nextInChain = (WGPUChainedStruct *)&texture_view_desc_extras,
+\t\t.format = webgpu_texture_format_from_rd(p_view.format),
+\t\t.mipLevelCount = texture_info->texture_view_desc.mipLevelCount,
+""",
+        """\tWGPUChainedStruct *starjunk_texture_view_next = (WGPUChainedStruct *)&texture_view_desc_extras;
+#if defined(WEBGPU_BACKEND_EMDAWN)
+\tif (!wgpuDeviceHasFeature(device, WGPUFeatureName_TextureComponentSwizzle)) {
+\t\tconst bool identity_swizzle =
+\t\t\t\tp_view.swizzle_r == TEXTURE_SWIZZLE_R &&
+\t\t\t\tp_view.swizzle_g == TEXTURE_SWIZZLE_G &&
+\t\t\t\tp_view.swizzle_b == TEXTURE_SWIZZLE_B &&
+\t\t\t\tp_view.swizzle_a == TEXTURE_SWIZZLE_A;
+\t\tERR_FAIL_COND_V_MSG(!identity_swizzle, TextureID(),
+\t\t\t\t"Browser WebGPU adapter does not support required texture component swizzle.");
+\t\tstarjunk_texture_view_next = nullptr;
+\t}
+#endif
+\tWGPUTextureViewDescriptor texture_view_desc = (WGPUTextureViewDescriptor){
+\t\t.nextInChain = starjunk_texture_view_next,
+\t\t.format = webgpu_texture_format_from_rd(p_view.format),
+\t\t.mipLevelCount = texture_info->texture_view_desc.mipLevelCount,
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """\tWGPUTextureFormat view_format = webgpu_texture_format_from_rd(p_view.format);
+\tWGPUTextureAspect aspect = webgpu_texture_aspect_from_rd_format(p_view.format);
+\tWGPUTextureViewDescriptor texture_view_desc = (WGPUTextureViewDescriptor){
+\t\t.nextInChain = (WGPUChainedStruct *)&texture_view_desc_extras,
+\t\t.format = view_format,
+\t\t.dimension = texture_info->texture_view_desc.dimension,
+""",
+        """\tWGPUTextureFormat view_format = webgpu_texture_format_from_rd(p_view.format);
+\tWGPUTextureAspect aspect = webgpu_texture_aspect_from_rd_format(p_view.format);
+\tWGPUChainedStruct *starjunk_texture_view_next = (WGPUChainedStruct *)&texture_view_desc_extras;
+#if defined(WEBGPU_BACKEND_EMDAWN)
+\tif (!wgpuDeviceHasFeature(device, WGPUFeatureName_TextureComponentSwizzle)) {
+\t\tconst bool identity_swizzle =
+\t\t\t\tp_view.swizzle_r == TEXTURE_SWIZZLE_R &&
+\t\t\t\tp_view.swizzle_g == TEXTURE_SWIZZLE_G &&
+\t\t\t\tp_view.swizzle_b == TEXTURE_SWIZZLE_B &&
+\t\t\t\tp_view.swizzle_a == TEXTURE_SWIZZLE_A;
+\t\tERR_FAIL_COND_V_MSG(!identity_swizzle, TextureID(),
+\t\t\t\t"Browser WebGPU adapter does not support required texture component swizzle.");
+\t\tstarjunk_texture_view_next = nullptr;
+\t}
+#endif
+\tWGPUTextureViewDescriptor texture_view_desc = (WGPUTextureViewDescriptor){
+\t\t.nextInChain = starjunk_texture_view_next,
+\t\t.format = view_format,
+\t\t.dimension = texture_info->texture_view_desc.dimension,
+""",
+    )
+
     print("Applied Starjunk WebGPU 4.7 compatibility patches")
 
 
