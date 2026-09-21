@@ -253,6 +253,98 @@ def main() -> int:
             {
                 "source": """
 window.__STARJUNK_BROWSER_EVENTS__ = [];
+
+(() => {
+    const pushWebGPUEvent = (kind, detail) => {
+        try {
+            window.__STARJUNK_BROWSER_EVENTS__.push({
+                type: kind,
+                ...detail
+            });
+        } catch (_) {}
+    };
+
+    if (typeof GPUDevice !== 'undefined' && GPUDevice.prototype) {
+        const wrapValidation = (methodName) => {
+            const original = GPUDevice.prototype[methodName];
+            if (typeof original !== 'function') return;
+            GPUDevice.prototype[methodName] = function (...args) {
+                const descriptor = args.length > 0 && args[0] && typeof args[0] === 'object' ? args[0] : {};
+                const label = String(descriptor.label || '');
+                this.pushErrorScope('validation');
+                let value;
+                try {
+                    value = original.apply(this, args);
+                } catch (error) {
+                    this.popErrorScope().catch(() => {});
+                    pushWebGPUEvent('webgpu_validation_throw', {
+                        method: methodName,
+                        label,
+                        message: String(error && error.message ? error.message : error),
+                        stack: error && error.stack ? String(error.stack) : ''
+                    });
+                    throw error;
+                }
+                this.popErrorScope().then((error) => {
+                    if (!error) return;
+                    pushWebGPUEvent('webgpu_validation_error', {
+                        method: methodName,
+                        label,
+                        message: String(error.message || error)
+                    });
+                }).catch((error) => {
+                    pushWebGPUEvent('webgpu_validation_scope_error', {
+                        method: methodName,
+                        label,
+                        message: String(error && error.message ? error.message : error)
+                    });
+                });
+                return value;
+            };
+        };
+
+        for (const method of [
+            'createBindGroupLayout',
+            'createPipelineLayout',
+            'createRenderPipeline',
+            'createComputePipeline'
+        ]) {
+            wrapValidation(method);
+        }
+
+        const originalCreateShaderModule = GPUDevice.prototype.createShaderModule;
+        if (typeof originalCreateShaderModule === 'function') {
+            GPUDevice.prototype.createShaderModule = function (...args) {
+                const descriptor = args.length > 0 && args[0] && typeof args[0] === 'object' ? args[0] : {};
+                const label = String(descriptor.label || '');
+                const module = originalCreateShaderModule.apply(this, args);
+                if (module && typeof module.getCompilationInfo === 'function') {
+                    module.getCompilationInfo().then((info) => {
+                        for (const message of info.messages || []) {
+                            if (message.type !== 'error' && message.type !== 'warning') continue;
+                            pushWebGPUEvent('webgpu_shader_compilation', {
+                                label,
+                                severity: String(message.type || ''),
+                                message: String(message.message || ''),
+                                line_num: Number(message.lineNum || 0),
+                                line_pos: Number(message.linePos || 0),
+                                offset: Number(message.offset || 0),
+                                length: Number(message.length || 0)
+                            });
+                        }
+                    }).catch((error) => {
+                        pushWebGPUEvent('webgpu_shader_compilation_info_error', {
+                            label,
+                            message: String(error && error.message ? error.message : error)
+                        });
+                    });
+                }
+                return module;
+            };
+        }
+    }
+})();
+
 window.addEventListener('error', (event) => {
     window.__STARJUNK_BROWSER_EVENTS__.push({
         type: 'error',
@@ -407,6 +499,7 @@ window.addEventListener('unhandledrejection', (event) => {
         renderer = str(payload.get("renderer", "")).lower()
         driver = str(payload.get("rendering_driver", "")).lower()
         event_summary = summarize_cdp_events(cdp.events)
+        browser_events = cdp.evaluate("window.__STARJUNK_BROWSER_EVENTS__ || []") or []
 
         result = {
             "schema_version": 2,
@@ -416,6 +509,7 @@ window.addEventListener('unhandledrejection', (event) => {
             "adapter_probe": adapter_probe,
             "payload": payload,
             "cdp_events": event_summary,
+            "browser_events": browser_events[-120:],
         }
 
         validation_errors: list[str] = []
@@ -426,7 +520,24 @@ window.addEventListener('unhandledrejection', (event) => {
                 f"Expected Web rendering driver label 'webgpu', got {driver!r}"
             )
 
-        renderer_errors = event_summary.get("renderer_errors", [])
+        renderer_errors = list(event_summary.get("renderer_errors", []))
+        for event in browser_events:
+            event_type = str(event.get("type", ""))
+            if event_type not in (
+                "webgpu_validation_error",
+                "webgpu_validation_throw",
+                "webgpu_shader_compilation",
+            ):
+                continue
+            severity = str(event.get("severity", ""))
+            if event_type == "webgpu_shader_compilation" and severity != "error":
+                continue
+            message = (
+                f"{event_type} {event.get('method', '')} "
+                f"{event.get('label', '')}: {event.get('message', '')}"
+            ).strip()
+            if message and message not in renderer_errors:
+                renderer_errors.append(message)
         if renderer_errors:
             validation_errors.append(
                 "Renderer validation errors observed: " + " | ".join(renderer_errors[:3])
