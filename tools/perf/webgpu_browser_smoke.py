@@ -328,7 +328,7 @@ def main() -> int:
     )
     cdp: CDP | None = None
     try:
-        ws_url = wait_for_page(debug_port, 15.0)
+        ws_url = wait_for_page(debug_port, 30.0)
         cdp = CDP(ws_url)
         for domain in ("Runtime", "Log", "Network", "Page"):
             cdp.call(f"{domain}.enable")
