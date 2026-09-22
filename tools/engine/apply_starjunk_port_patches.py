@@ -1161,6 +1161,57 @@ static const char WEBGPU_WGSL_PRELUDE[] =
 """,
     )
 
+    # Godot 4.7 glslang emits newer SPIR-V operations that the pinned legacy
+    # Naga frontend does not handle. The polished WebGPU backend rewrites these
+    # two operations before translation; forward-port the same compatibility
+    # shim here without changing descriptor/binding semantics.
+    replace_once(
+        translate_implementation,
+        """ConvertResult webgpu_translate_spirv_to_wgsl(const uint32_t *spv, uint32_t spv_count) {
+\tuint8_t success;
+""",
+        """static Vector<uint32_t> starjunk_webgpu_preprocess_modern_spirv(const uint32_t *p_spv, uint32_t p_spv_count) {
+\tVector<uint32_t> out;
+\tout.resize(p_spv_count);
+\tif (p_spv_count > 0) {
+\t\tmemcpy(out.ptrw(), p_spv, (size_t)p_spv_count * sizeof(uint32_t));
+\t}
+\tif (p_spv_count < 5) {
+\t\treturn out;
+\t}
+
+\tstatic constexpr uint16_t SPV_OP_COPY_OBJECT = 83;
+\tstatic constexpr uint16_t SPV_OP_KILL = 252;
+\tstatic constexpr uint16_t SPV_OP_COPY_LOGICAL = 400;
+\tstatic constexpr uint16_t SPV_OP_TERMINATE_INVOCATION = 4416;
+
+\tuint32_t pos = 5;
+\twhile (pos < p_spv_count) {
+\t\tuint32_t word0 = out[pos];
+\t\tuint32_t word_count = word0 >> 16;
+\t\tuint16_t opcode = (uint16_t)(word0 & 0xFFFF);
+\t\tif (word_count == 0 || pos + word_count > p_spv_count) {
+\t\t\tbreak;
+\t\t}
+\t\tif (opcode == SPV_OP_COPY_LOGICAL) {
+\t\t\tout.write[pos] = (word_count << 16) | SPV_OP_COPY_OBJECT;
+\t\t} else if (opcode == SPV_OP_TERMINATE_INVOCATION) {
+\t\t\tout.write[pos] = (word_count << 16) | SPV_OP_KILL;
+\t\t}
+\t\tpos += word_count;
+\t}
+\treturn out;
+}
+
+ConvertResult webgpu_translate_spirv_to_wgsl(const uint32_t *spv, uint32_t spv_count) {
+\tVector<uint32_t> starjunk_preprocessed_spirv = starjunk_webgpu_preprocess_modern_spirv(spv, spv_count);
+\tspv = starjunk_preprocessed_spirv.ptr();
+\tspv_count = starjunk_preprocessed_spirv.size();
+
+\tuint8_t success;
+""",
+    )
+
     print("Applied Starjunk WebGPU 4.7 compatibility patches")
 
 
