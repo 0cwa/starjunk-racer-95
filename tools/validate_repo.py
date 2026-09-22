@@ -16,6 +16,7 @@ REQUIRED = [
     "tools/engine/build_webgpu_rust_deps.sh",
     "tools/engine/forward_port_probe.sh",
     "tools/engine/export_webgpu_benchmark.sh",
+    "tools/engine/analyze_spirv_dumps.sh",
     "tools/perf/webgpu_browser_smoke.py",
     "game/tests/perf/webgpu_boot/webgpu_boot.gd",
     "game/tests/perf/webgpu_boot/webgpu_boot.tscn",
