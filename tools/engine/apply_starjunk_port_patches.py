@@ -1240,7 +1240,7 @@ ConvertResult webgpu_translate_spirv_to_wgsl(const uint32_t *spv, uint32_t spv_c
 \t\t\t\t}
 \t\t\t\tString encoded = CryptoCore::b64_encode_str(p_bytes, p_size);
 \t\t\t\tstatic constexpr int64_t STARJUNK_DUMP_CHUNK = 12000;
-\t\t\t\tconst int64_t chunk_count = MAX<int64_t>(1, (encoded.length() + STARJUNK_DUMP_CHUNK - 1) / STARJUNK_DUMP_CHUNK);
+\t\t\t\tint64_t chunk_count = (encoded.length() + STARJUNK_DUMP_CHUNK - 1) / STARJUNK_DUMP_CHUNK;\n\t\t\t\tif (chunk_count < 1) {\n\t\t\t\t\tchunk_count = 1;\n\t\t\t\t}
 \t\t\t\tfor (int64_t chunk_index = 0; chunk_index < chunk_count; chunk_index++) {
 \t\t\t\t\tprint_line(
 \t\t\t\t\t\t\t"STARJUNK_SPIRV_DUMP:",
