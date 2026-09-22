@@ -122,6 +122,7 @@ jobs:
             --result-global __STARJUNK_BOOT_RESULT__ \
             --purpose browser_webgpu_boot \
             --expected-profile boot \
+            --spirv-dump-dir build/webgpu-spv \
             --timeout 45
           cat build/webgpu-boot-smoke.json
       - uses: actions/upload-artifact@v4
@@ -129,4 +130,10 @@ jobs:
         with:
           name: webgpu-browser-boot
           path: build/webgpu-boot-smoke.json
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: webgpu-spv-dumps
+          path: build/webgpu-spv/
           if-no-files-found: warn
