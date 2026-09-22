@@ -28,7 +28,7 @@ jobs:
         with:
           name: godot-4.7.2-webgpu-template
           path: build/replay-template
-          run-id: 35673516500
+          run-id: 35737160581
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Download upstream Godot editor for export
         env:
@@ -55,10 +55,18 @@ jobs:
             --result-global __STARJUNK_BOOT_RESULT__ \
             --purpose browser_webgpu_template_replay \
             --expected-profile boot \
+            --spirv-dump-dir build/webgpu-replay-spv \
             --timeout 45
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: webgpu-template-replay
           path: build/webgpu-template-replay.json
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: webgpu-template-replay-spv
+          path: build/webgpu-replay-spv/
           if-no-files-found: warn
