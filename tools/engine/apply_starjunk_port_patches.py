@@ -739,7 +739,7 @@ static const char WEBGPU_WGSL_PRELUDE[] =
 """,
         """\tWGPUDeviceDescriptor device_desc = (WGPUDeviceDescriptor){
 #if defined(WEBGPU_BACKEND_EMDAWN)
-\t\t.requiredFeatureCount = starjunk_required_features.size(),
+\t\t.requiredFeatureCount = (size_t)starjunk_required_features.size(),
 \t\t.requiredFeatures = starjunk_required_features.ptr(),
 #else
 \t\t.requiredFeatureCount = sizeof(required_features) / sizeof(WGPUFeatureName),
