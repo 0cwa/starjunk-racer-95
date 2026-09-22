@@ -32,6 +32,7 @@ def main() -> None:
     platform_header = source / "drivers/webgpu/webgpu_platform.h"
     main_implementation = source / "main/main.cpp"
     forward_mobile_implementation = source / "servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp"
+    forward_mobile_shader_include = source / "servers/rendering/renderer_rd/shaders/forward_mobile/scene_forward_mobile_inc.glsl"
 
     replace_once(
         device_implementation,
@@ -1261,6 +1262,40 @@ ConvertResult webgpu_translate_spirv_to_wgsl(const uint32_t *spv, uint32_t spv_c
 
 \t\t\tERR_PRINT(vformat(
 \t\t\t\t\t"WebGPU WGSL translation failed for %s stage %s at translator step %d: %s",
+""",
+    )
+
+    # shader_count_for() only packs NONE/SINGLE/MULTIPLE (0/1/2), but the
+    # GLSL helper has no syntactic fallback for the unused 2-bit value 3.
+    # Vulkan accepts the resulting OpUndef return path; the pinned legacy Naga
+    # validator rejects the otherwise-valid helper. Give the unreachable state
+    # deterministic NONE semantics so WebGPU translation has total control flow.
+    replace_once(
+        forward_mobile_shader_include,
+        """uint option_to_count(uint option, uint bound) {
+\tswitch (option) {
+\t\tcase SHADER_COUNT_NONE:
+\t\t\treturn 0;
+\t\tcase SHADER_COUNT_SINGLE:
+\t\t\treturn 1;
+\t\tcase SHADER_COUNT_MULTIPLE:
+\t\t\treturn bound;
+\t}
+}
+""",
+        """uint option_to_count(uint option, uint bound) {
+\tswitch (option) {
+\t\tcase SHADER_COUNT_NONE:
+\t\t\treturn 0;
+\t\tcase SHADER_COUNT_SINGLE:
+\t\t\treturn 1;
+\t\tcase SHADER_COUNT_MULTIPLE:
+\t\t\treturn bound;
+\t}
+\t// The C++ specialization packer only emits values 0..2. Keep the unused
+\t// value deterministic for WebGPU translators that require total returns.
+\treturn 0;
+}
 """,
     )
 
