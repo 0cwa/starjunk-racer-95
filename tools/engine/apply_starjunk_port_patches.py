@@ -1212,6 +1212,58 @@ ConvertResult webgpu_translate_spirv_to_wgsl(const uint32_t *spv, uint32_t spv_c
 """,
     )
 
+    replace_once(
+        shader_container_implementation,
+        """#include "core/error/error_macros.h"
+#include "core/io/marshalls.h"
+""",
+        """#include "core/error/error_macros.h"
+#include "core/crypto/crypto_core.h"
+#include "core/io/marshalls.h"
+""",
+    )
+
+    # Emit exact failing SPIR-V bytes through structured console chunks so the
+    # browser harness can reconstruct real .spv artifacts for spirv-val /
+    # disassembly. This runs only after translation has already failed and does
+    # not alter shader code or renderer behavior.
+    replace_once(
+        shader_container_implementation,
+        """\t\tif (result.error_string != nullptr) {
+\t\t\tERR_PRINT(vformat(
+\t\t\t\t\t"WebGPU WGSL translation failed for %s stage %s at translator step %d: %s",
+""",
+        """\t\tif (result.error_string != nullptr) {
+\t\t\tauto starjunk_emit_spirv_dump = [&](const char *p_kind, const uint8_t *p_bytes, size_t p_size) {
+\t\t\t\tif (!starjunk_probe_shader || p_bytes == nullptr || p_size == 0) {
+\t\t\t\t\treturn;
+\t\t\t\t}
+\t\t\t\tString encoded = CryptoCore::b64_encode_str(p_bytes, p_size);
+\t\t\t\tstatic constexpr int64_t STARJUNK_DUMP_CHUNK = 12000;
+\t\t\t\tconst int64_t chunk_count = MAX<int64_t>(1, (encoded.length() + STARJUNK_DUMP_CHUNK - 1) / STARJUNK_DUMP_CHUNK);
+\t\t\t\tfor (int64_t chunk_index = 0; chunk_index < chunk_count; chunk_index++) {
+\t\t\t\t\tprint_line(
+\t\t\t\t\t\t\t"STARJUNK_SPIRV_DUMP:",
+\t\t\t\t\t\t\tshader_name_str, "|",
+\t\t\t\t\t\t\titos((int)patched[i].shader_stage), "|",
+\t\t\t\t\t\t\tp_kind, "|",
+\t\t\t\t\t\t\titos(chunk_index), "|",
+\t\t\t\t\t\t\titos(chunk_count), "|",
+\t\t\t\t\t\t\tencoded.substr(chunk_index * STARJUNK_DUMP_CHUNK, STARJUNK_DUMP_CHUNK));
+\t\t\t\t}
+\t\t\t};
+\t\t\tSpan<uint32_t> starjunk_raw_stage = p_spirv[i].spirv();
+\t\t\tstarjunk_emit_spirv_dump(
+\t\t\t\t\t"raw",
+\t\t\t\t\t(const uint8_t *)starjunk_raw_stage.ptr(),
+\t\t\t\t\tstarjunk_raw_stage.size() * sizeof(uint32_t));
+\t\t\tstarjunk_emit_spirv_dump("final", spv_bytes.ptr(), spv_bytes.size());
+
+\t\t\tERR_PRINT(vformat(
+\t\t\t\t\t"WebGPU WGSL translation failed for %s stage %s at translator step %d: %s",
+""",
+    )
+
     print("Applied Starjunk WebGPU 4.7 compatibility patches")
 
 
