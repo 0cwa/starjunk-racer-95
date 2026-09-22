@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
+import re
 import http.server
 import json
 import os
@@ -114,6 +117,7 @@ def wait_for_page(debug_port: int, timeout: float) -> str:
 
 
 WEBGPU_EVENT_CONSOLE_PREFIX = "STARJUNK_WEBGPU_EVENT_JSON:"
+SPIRV_DUMP_CONSOLE_PREFIX = "STARJUNK_SPIRV_DUMP:"
 RESULT_CONSOLE_PREFIXES = {
     "__STARJUNK_BOOT_RESULT__": "STARJUNK_WEBGPU_BOOT_JSON:",
     "__STARJUNK_PERF_RESULT__": "STARJUNK_PERF_JSON:",
@@ -175,6 +179,70 @@ def extract_browser_events(events: list[dict]) -> list[dict]:
         if isinstance(payload, dict):
             parsed.append(payload)
     return parsed
+
+
+def write_spirv_dumps(events: list[dict], dump_dir: Path | None) -> list[dict]:
+    groups: dict[tuple[str, int, str], dict] = {}
+    for event in events:
+        for value in console_values(event):
+            if not isinstance(value, str) or not value.startswith(SPIRV_DUMP_CONSOLE_PREFIX):
+                continue
+            encoded = value[len(SPIRV_DUMP_CONSOLE_PREFIX):]
+            parts = encoded.split("|", 5)
+            if len(parts) != 6:
+                continue
+            shader_name, stage_text, kind, chunk_text, total_text, chunk_data = parts
+            try:
+                stage = int(stage_text)
+                chunk_index = int(chunk_text)
+                total_chunks = int(total_text)
+            except ValueError:
+                continue
+            if chunk_index < 0 or total_chunks <= 0 or chunk_index >= total_chunks:
+                continue
+            key = (shader_name, stage, kind)
+            group = groups.setdefault(
+                key,
+                {"total": total_chunks, "chunks": {}, "shader": shader_name, "stage": stage, "kind": kind},
+            )
+            if group["total"] != total_chunks:
+                continue
+            group["chunks"][chunk_index] = chunk_data
+
+    summaries: list[dict] = []
+    if dump_dir is not None:
+        dump_dir.mkdir(parents=True, exist_ok=True)
+    for (_, _, _), group in sorted(groups.items()):
+        total = int(group["total"])
+        chunks = group["chunks"]
+        complete = len(chunks) == total and all(i in chunks for i in range(total))
+        summary = {
+            "shader": group["shader"],
+            "stage": group["stage"],
+            "kind": group["kind"],
+            "chunks": len(chunks),
+            "expected_chunks": total,
+            "complete": complete,
+        }
+        if complete:
+            try:
+                raw = base64.b64decode("".join(chunks[i] for i in range(total)), validate=True)
+            except Exception as exc:
+                summary["decode_error"] = str(exc)
+                complete = False
+                summary["complete"] = False
+            else:
+                digest = hashlib.sha256(raw).hexdigest()
+                summary["size_bytes"] = len(raw)
+                summary["sha256"] = digest
+                if dump_dir is not None:
+                    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(group["shader"])).strip("_") or "shader"
+                    filename = f"{safe}_stage{group['stage']}_{group['kind']}.spv"
+                    path = dump_dir / filename
+                    path.write_bytes(raw)
+                    summary["file"] = filename
+        summaries.append(summary)
+    return summaries
 
 
 def tail_text(path: Path, limit: int = 12000) -> str:
@@ -262,6 +330,7 @@ def main() -> int:
     parser.add_argument("--result-global", default="__STARJUNK_PERF_RESULT__")
     parser.add_argument("--purpose", default="browser_webgpu_smoke")
     parser.add_argument("--expected-profile", default="")
+    parser.add_argument("--spirv-dump-dir", default="")
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
@@ -530,6 +599,8 @@ window.addEventListener('unhandledrejection', (event) => {
                 time.sleep(0.5)
 
         browser_events = extract_browser_events(cdp.events)
+        spirv_dump_dir = Path(args.spirv_dump_dir).resolve() if args.spirv_dump_dir else None
+        spirv_dumps = write_spirv_dumps(cdp.events, spirv_dump_dir)
         if payload is None:
             stdout_handle.flush()
             stderr_handle.flush()
@@ -547,6 +618,7 @@ window.addEventListener('unhandledrejection', (event) => {
                 "cdp_events": summarize_cdp_events(cdp.events),
                 "chromium_stdout_tail": tail_text(stdout_path),
                 "chromium_stderr_tail": tail_text(stderr_path),
+                "spirv_dumps": spirv_dumps,
                 "error": (
                     f"Timed out waiting for console result {result_console_prefix!r}"
                     if result_console_prefix
@@ -571,6 +643,7 @@ window.addEventListener('unhandledrejection', (event) => {
             "payload": payload,
             "cdp_events": event_summary,
             "browser_events": browser_events[-120:],
+            "spirv_dumps": spirv_dumps,
         }
 
         validation_errors: list[str] = []
