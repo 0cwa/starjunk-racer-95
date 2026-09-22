@@ -115,6 +115,8 @@ jobs:
             "$GITHUB_WORKSPACE/build/webgpu-boot" \
             "res://tests/perf/webgpu_boot/webgpu_boot.tscn"
       - name: Run Chromium Godot WebGPU boot gate
+        id: browser-gate
+        continue-on-error: true
         run: |
           python3 tools/perf/webgpu_browser_smoke.py \
             --root build/webgpu-boot \
@@ -125,6 +127,17 @@ jobs:
             --spirv-dump-dir build/webgpu-spv \
             --timeout 45
           cat build/webgpu-boot-smoke.json
+      - name: Analyze captured SPIR-V
+        if: always()
+        run: |
+          if compgen -G 'build/webgpu-spv/*.spv' > /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y spirv-tools
+            tools/engine/analyze_spirv_dumps.sh build/webgpu-spv build/webgpu-spv-analysis
+            cat build/webgpu-spv-analysis/summary.txt
+          else
+            echo "No failing SPIR-V dumps captured."
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -137,3 +150,12 @@ jobs:
           name: webgpu-spv-dumps
           path: build/webgpu-spv/
           if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: webgpu-spv-analysis
+          path: build/webgpu-spv-analysis/
+          if-no-files-found: warn
+      - name: Enforce Chromium WebGPU boot gate
+        if: ${{ always() && steps.browser-gate.outcome != 'success' }}
+        run: exit 1
