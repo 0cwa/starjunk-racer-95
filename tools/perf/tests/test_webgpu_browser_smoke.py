@@ -68,6 +68,21 @@ class WebGPUBrowserSmokeParsingTests(unittest.TestCase):
             dumped = Path(temp_dir, summaries[0]["file"]).read_bytes()
             self.assertEqual(dumped, raw)
 
+    def test_reconstructs_spaced_godot_print_line_spirv_dump(self):
+        raw = b"\x03\x02#\x07" + bytes(range(16))
+        encoded = base64.b64encode(raw).decode("ascii")
+        event = console_event(
+            f"{SPIRV_DUMP_CONSOLE_PREFIX} SceneForwardMobileShaderRD:0 | 1 | raw | 0 | 1 | {encoded}"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            summaries = write_spirv_dumps([event], Path(temp_dir))
+            self.assertEqual(len(summaries), 1)
+            self.assertTrue(summaries[0]["complete"])
+            self.assertEqual(summaries[0]["shader"], "SceneForwardMobileShaderRD:0")
+            self.assertEqual(summaries[0]["kind"], "raw")
+            dumped = Path(temp_dir, summaries[0]["file"]).read_bytes()
+            self.assertEqual(dumped, raw)
+
     def test_extracts_structured_webgpu_events(self):
         validation = {
             "type": "webgpu_validation_error",
