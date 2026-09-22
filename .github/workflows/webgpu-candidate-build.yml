@@ -49,7 +49,8 @@ jobs:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Restore WebGPU build caches
-        uses: actions/cache@v4
+        id: webgpu-cache-restore
+        uses: actions/cache/restore@v4
         with:
           path: |
             .cache/scons-godot-webgpu
@@ -90,6 +91,13 @@ jobs:
             cache_path="$SCONS_CACHE" \
             cache_limit=8 \
             -j2
+      - name: Save WebGPU build caches
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .cache/scons-godot-webgpu
+            .cache/cargo-webgpu
+          key: ${{ steps.webgpu-cache-restore.outputs.cache-primary-key }}
       - name: List build outputs
         if: always()
         run: find build/webgpu-port-candidate/godot/bin -maxdepth 1 -type f -printf '%f %s bytes\n' 2>/dev/null | sort || true
