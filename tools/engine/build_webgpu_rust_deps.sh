@@ -23,9 +23,10 @@ print(deps["naga_native"]["commit"])
 print(deps["spirv_webgpu_transform"]["repository"])
 print(deps["spirv_webgpu_transform"]["commit"])
 patches = deps["spirv_webgpu_transform"].get("patches", [])
-if len(patches) != 1:
-    raise SystemExit("spirv_webgpu_transform must declare exactly one reviewed local patch")
-print(patches[0])
+if not patches:
+    raise SystemExit("spirv_webgpu_transform must declare reviewed local patches")
+for patch in patches:
+    print(patch)
 PY
 )
 
@@ -33,7 +34,7 @@ NAGA_REPO="${VALUES[0]}"
 NAGA_SHA="${VALUES[1]}"
 SPIRV_REPO="${VALUES[2]}"
 SPIRV_SHA="${VALUES[3]}"
-SPIRV_PATCH_REL="${VALUES[4]}"
+SPIRV_PATCH_RELS=("${VALUES[@]:4}")
 
 # The Godot bridge deliberately carries TAG files instead of the archives.
 # Refuse to build if its declared dependency identity differs from our lock.
@@ -56,17 +57,19 @@ clone_at() {
 clone_at "$NAGA_REPO" "$NAGA_SHA" "$WORK_ROOT/naga-native"
 clone_at "$SPIRV_REPO" "$SPIRV_SHA" "$WORK_ROOT/spirv-webgpu-transform"
 
-# The pinned transform library accidentally aliases OpNop to opcode 1, which is
-# OpUndef in SPIR-V. Its shared prune_noops() therefore deletes legitimate
-# OpUndef definitions from transformed shaders and leaves dangling result IDs.
-# Keep the upstream revision pinned, but apply the smallest reviewed source
-# correction before building so dependency identity and local compatibility
-# changes remain separately auditable.
-SPIRV_TRANSFORM_PATCH="$ROOT/$SPIRV_PATCH_REL"
-git -C "$WORK_ROOT/spirv-webgpu-transform" apply --check "$SPIRV_TRANSFORM_PATCH"
-git -C "$WORK_ROOT/spirv-webgpu-transform" apply "$SPIRV_TRANSFORM_PATCH"
+# Keep the upstream transform revision pinned, but apply the ordered reviewed
+# local compatibility patch series before building. Dependency identity and
+# Starjunk corrections remain separately auditable in source-lock.json.
+for patch_rel in "${SPIRV_PATCH_RELS[@]}"; do
+  patch_path="$ROOT/$patch_rel"
+  test -s "$patch_path"
+  git -C "$WORK_ROOT/spirv-webgpu-transform" apply --check "$patch_path"
+  git -C "$WORK_ROOT/spirv-webgpu-transform" apply "$patch_path"
+done
 grep -Fq 'pub const SPV_INSTRUCTION_OP_NOP: u16 = 0;' \
   "$WORK_ROOT/spirv-webgpu-transform/src/spv.rs"
+grep -Fq 'An opaque binding-array element may be passed directly to a helper' \
+  "$WORK_ROOT/spirv-webgpu-transform/src/splitbindingarray.rs"
 
 rustup target add wasm32-unknown-emscripten
 
