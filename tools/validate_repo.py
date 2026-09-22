@@ -71,6 +71,14 @@ def main() -> None:
         commit = lock["webgpu_rust_dependencies"][key]["commit"]
         if len(commit) != 40 or any(c not in "0123456789abcdef" for c in commit):
             raise SystemExit(f"webgpu_rust_dependencies.{key} is not pinned to a full SHA")
+
+    transform_dependency = lock["webgpu_rust_dependencies"]["spirv_webgpu_transform"]
+    expected_transform_patch = "engine/patches/spirv-webgpu-transform-fix-opnop.patch"
+    if transform_dependency.get("patches") != [expected_transform_patch]:
+        raise SystemExit(
+            "spirv_webgpu_transform must declare the reviewed OpNop correction patch"
+        )
+
     if lock.get("emscripten") != "6.0.9":
         raise SystemExit("WebGPU candidate Emscripten must remain pinned to 6.0.9")
 
@@ -86,8 +94,8 @@ def main() -> None:
     rust_build = (ROOT / "tools/engine/build_webgpu_rust_deps.sh").read_text(
         encoding="utf-8"
     )
-    if "spirv-webgpu-transform-fix-opnop.patch" not in rust_build:
-        raise SystemExit("WebGPU Rust dependency build must apply the OpNop correction")
+    if 'SPIRV_PATCH_REL="${VALUES[4]}"' not in rust_build:
+        raise SystemExit("WebGPU Rust dependency build must read the locked local patch")
 
     network_lock = json.loads(
         (ROOT / "networking/source-lock.json").read_text(encoding="utf-8")
