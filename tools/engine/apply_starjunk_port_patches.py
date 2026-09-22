@@ -1104,7 +1104,7 @@ static const char WEBGPU_WGSL_PRELUDE[] =
         """\t\tright_spirv.resize(out_right_spirv_count * sizeof(uint32_t));
 \t\tmemcpy(right_spirv.ptrw(), out_right_spirv, right_spirv.size());
 
-\t\t// Right is always right!
+\t\t// Right is always right! (Right is the fragment shader which is typically chonkier but this doesn't matter.)
 """,
         """\t\tright_spirv.resize(out_right_spirv_count * sizeof(uint32_t));
 \t\tmemcpy(right_spirv.ptrw(), out_right_spirv, right_spirv.size());
