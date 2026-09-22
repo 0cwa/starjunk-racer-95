@@ -2,7 +2,7 @@ diff --git a/src/spv.rs b/src/spv.rs
 index 7b2f7a1..f2c4937 100644
 --- a/src/spv.rs
 +++ b/src/spv.rs
-@@ -4,7 +4,7 @@ pub const SPV_HEADER_MAGIC_NUM_OFFSET: usize = 0;
+@@ -4,6 +4,6 @@ pub const SPV_HEADER_MAGIC_NUM_OFFSET: usize = 0;
  pub const SPV_HEADER_INSTRUCTION_BOUND_OFFSET: usize = 3;
  
 -pub const SPV_INSTRUCTION_OP_NOP: u16 = 1;
