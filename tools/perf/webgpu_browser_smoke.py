@@ -206,11 +206,11 @@ def summarize_cdp_events(events: list[dict]) -> dict:
                 "values": values,
                 "timestamp": params.get("timestamp"),
             })
-            if console_type == "error":
-                for value in values:
-                    message = str(value)
-                    if message and message not in renderer_errors:
-                        renderer_errors.append(message)
+            for value in values:
+                message = str(value)
+                translation_failure = "[WGPU] WGSL compilation " in message
+                if (console_type == "error" or translation_failure) and message and message not in renderer_errors:
+                    renderer_errors.append(message)
         elif method == "Runtime.exceptionThrown":
             details = params.get("exceptionDetails", {})
             exception = details.get("exception", {})
