@@ -192,7 +192,9 @@ def write_spirv_dumps(events: list[dict], dump_dir: Path | None) -> list[dict]:
             parts = encoded.split("|", 5)
             if len(parts) != 6:
                 continue
-            shader_name, stage_text, kind, chunk_text, total_text, chunk_data = parts
+            shader_name, stage_text, kind, chunk_text, total_text, chunk_data = (
+                part.strip() for part in parts
+            )
             try:
                 stage = int(stage_text)
                 chunk_index = int(chunk_text)
