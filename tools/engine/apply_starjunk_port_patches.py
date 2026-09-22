@@ -890,6 +890,29 @@ static const char WEBGPU_WGSL_PRELUDE[] =
 """,
     )
 
+    # Promote the translator's named failure to a renderer error. The bridge
+    # previously used print_line(), which our browser artifact intentionally
+    # truncates as ordinary console noise, leaving only Godot's generic
+    # "Failed to compile code to native for SPIR-V" downstream error.
+    replace_once(
+        shader_container_implementation,
+        """\t\tif (result.error_string != nullptr) {
+\t\t\tprint_line("[WGPU] WGSL compilation ", shader_name_str, "on step", (int)result.failure_stage, ":", result.error_string.ptr());
+\t\t\treturn false;
+\t\t}
+""",
+        """\t\tif (result.error_string != nullptr) {
+\t\t\tERR_PRINT(vformat(
+\t\t\t\t\t"WebGPU WGSL translation failed for %s stage %s at translator step %d: %s",
+\t\t\t\t\tshader_name_str,
+\t\t\t\t\tString(SHADER_STAGE_NAMES[patched[i].shader_stage]),
+\t\t\t\t\t(int)result.failure_stage,
+\t\t\t\t\tString::utf8(result.error_string.ptr())));
+\t\t\treturn false;
+\t\t}
+""",
+    )
+
     print("Applied Starjunk WebGPU 4.7 compatibility patches")
 
 
