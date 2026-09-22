@@ -192,6 +192,12 @@ def write_spirv_dumps(events: list[dict], dump_dir: Path | None) -> list[dict]:
             if len(parts) != 6:
                 continue
             shader_name, stage_text, kind, chunk_text, total_text, chunk_data = parts
+            # Godot print_line() inserts spaces between Variant arguments. Accept
+            # both the current spaced console form and a future concatenated
+            # emitter without letting formatting whitespace corrupt base64.
+            shader_name = shader_name.strip()
+            kind = kind.strip()
+            chunk_data = chunk_data.strip()
             try:
                 stage = int(stage_text)
                 chunk_index = int(chunk_text)
