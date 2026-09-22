@@ -1,11 +1,16 @@
+import base64
 import json
+from pathlib import Path
+import tempfile
 import unittest
 
 from tools.perf.webgpu_browser_smoke import (
+    SPIRV_DUMP_CONSOLE_PREFIX,
     WEBGPU_EVENT_CONSOLE_PREFIX,
     console_json_from_event,
     extract_browser_events,
     find_console_json,
+    write_spirv_dumps,
 )
 
 
@@ -41,6 +46,27 @@ class WebGPUBrowserSmokeParsingTests(unittest.TestCase):
         self.assertIsNone(
             console_json_from_event(event, "STARJUNK_WEBGPU_BOOT_JSON:")
         )
+
+    def test_reconstructs_chunked_spirv_dump(self):
+        raw = b"\x03\x02#\x07" + bytes(range(32))
+        encoded = base64.b64encode(raw).decode("ascii")
+        midpoint = len(encoded) // 2
+        prefix = "SceneForwardMobileShaderRD:0|1|raw"
+        events = [
+            console_event(
+                f"{SPIRV_DUMP_CONSOLE_PREFIX}{prefix}|1|2|{encoded[midpoint:]}"
+            ),
+            console_event(
+                f"{SPIRV_DUMP_CONSOLE_PREFIX}{prefix}|0|2|{encoded[:midpoint]}"
+            ),
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            summaries = write_spirv_dumps(events, Path(temp_dir))
+            self.assertEqual(len(summaries), 1)
+            self.assertTrue(summaries[0]["complete"])
+            self.assertEqual(summaries[0]["size_bytes"], len(raw))
+            dumped = Path(temp_dir, summaries[0]["file"]).read_bytes()
+            self.assertEqual(dumped, raw)
 
     def test_extracts_structured_webgpu_events(self):
         validation = {
