@@ -955,6 +955,212 @@ static const char WEBGPU_WGSL_PRELUDE[] =
 """,
     )
 
+    # Diagnose which legacy SPIR-V transform first makes the known failing
+    # Forward Mobile / SMAA shaders unacceptable to Naga. This does not alter
+    # shader output: snapshots are translated only after the normal final
+    # translation has already failed.
+    replace_once(
+        shader_container_implementation,
+        """\tpatched.resize(p_spirv.size());
+\tcorrection_maps.resize(p_spirv.size());
+
+\tconst uint32_t immediates_set = MIN((uint32_t)p_shader.uniform_sets.size(), (uint32_t)(WEBGPU_MAX_BIND_GROUPS - 1));
+""",
+        """\tpatched.resize(p_spirv.size());
+\tcorrection_maps.resize(p_spirv.size());
+
+\tstruct StarjunkTransformProbe {
+\t\tString name;
+\t\tVector<uint8_t> spirv;
+\t};
+\tconst bool starjunk_probe_shader =
+\t\t\tshader_name_str.contains("SceneForwardMobileShaderRD") ||
+\t\t\tshader_name_str.contains("Smaa");
+\tVector<Vector<StarjunkTransformProbe>> starjunk_transform_probes;
+\tif (starjunk_probe_shader) {
+\t\tstarjunk_transform_probes.resize(p_spirv.size());
+\t}
+\tauto starjunk_capture_probe = [&](uint32_t p_stage_index, const char *p_name, const uint32_t *p_words, uint32_t p_word_count) {
+\t\tif (!starjunk_probe_shader || p_stage_index >= (uint32_t)starjunk_transform_probes.size() || p_words == nullptr || p_word_count == 0) {
+\t\t\treturn;
+\t\t}
+\t\tStarjunkTransformProbe probe;
+\t\tprobe.name = p_name;
+\t\tprobe.spirv.resize((int64_t)p_word_count * sizeof(uint32_t));
+\t\tmemcpy(probe.spirv.ptrw(), p_words, probe.spirv.size());
+\t\tstarjunk_transform_probes.write[p_stage_index].push_back(probe);
+\t};
+
+\tconst uint32_t immediates_set = MIN((uint32_t)p_shader.uniform_sets.size(), (uint32_t)(WEBGPU_MAX_BIND_GROUPS - 1));
+""",
+    )
+
+    replace_once(
+        shader_container_implementation,
+        """\t\tmemcpy(in_spirv.ptrw(), stage_spirv.ptr(), stage_spirv.size() * sizeof(uint32_t));
+
+#ifdef DEBUG_SHADERS
+""",
+        """\t\tmemcpy(in_spirv.ptrw(), stage_spirv.ptr(), stage_spirv.size() * sizeof(uint32_t));
+\t\tstarjunk_capture_probe(i, "raw", in_spirv.ptr(), in_spirv.size());
+
+#ifdef DEBUG_SHADERS
+""",
+    )
+
+    replace_once(
+        shader_container_implementation,
+        """\t\tspirv_webgpu_transform_combimgsampsplitter_alloc(in_spirv.ptrw(), in_spirv.size(), &combimg_out_spv, &combimg_out_count, &map);
+
+\t\tuint32_t *dref_out_spv = nullptr;
+""",
+        """\t\tspirv_webgpu_transform_combimgsampsplitter_alloc(in_spirv.ptrw(), in_spirv.size(), &combimg_out_spv, &combimg_out_count, &map);
+\t\tstarjunk_capture_probe(i, "split_combined", combimg_out_spv, combimg_out_count);
+
+\t\tuint32_t *dref_out_spv = nullptr;
+""",
+    )
+
+    replace_once(
+        shader_container_implementation,
+        """\t\tspirv_webgpu_transform_drefsplitter_alloc(combimg_out_spv, combimg_out_count, &dref_out_spv, &dref_out_count, &map);
+
+\t\tuint32_t *isnanisinf_out_spv = nullptr;
+""",
+        """\t\tspirv_webgpu_transform_drefsplitter_alloc(combimg_out_spv, combimg_out_count, &dref_out_spv, &dref_out_count, &map);
+\t\tstarjunk_capture_probe(i, "split_dref", dref_out_spv, dref_out_count);
+
+\t\tuint32_t *isnanisinf_out_spv = nullptr;
+""",
+    )
+
+    replace_once(
+        shader_container_implementation,
+        """\t\tspirv_webgpu_transform_isnanisinfpatch_alloc(dref_out_spv, dref_out_count, &isnanisinf_out_spv, &isnanisinf_out_count);
+
+\t\tuint32_t *storagecube_out_spv = nullptr;
+""",
+        """\t\tspirv_webgpu_transform_isnanisinfpatch_alloc(dref_out_spv, dref_out_count, &isnanisinf_out_spv, &isnanisinf_out_count);
+\t\tstarjunk_capture_probe(i, "isnan_isinf", isnanisinf_out_spv, isnanisinf_out_count);
+
+\t\tuint32_t *storagecube_out_spv = nullptr;
+""",
+    )
+
+    replace_once(
+        shader_container_implementation,
+        """\t\tspirv_webgpu_transform_storagecubepatch_alloc(isnanisinf_out_spv, isnanisinf_out_count, &storagecube_out_spv, &storagecube_out_count, &map);
+
+\t\tuint32_t *immediates_out_spv = nullptr;
+""",
+        """\t\tspirv_webgpu_transform_storagecubepatch_alloc(isnanisinf_out_spv, isnanisinf_out_count, &storagecube_out_spv, &storagecube_out_count, &map);
+\t\tstarjunk_capture_probe(i, "storage_cube", storagecube_out_spv, storagecube_out_count);
+
+\t\tuint32_t *immediates_out_spv = nullptr;
+""",
+    )
+
+    replace_once(
+        shader_container_implementation,
+        """\t\tspirv_webgpu_transform_immediatespatch_alloc(storagecube_out_spv, storagecube_out_count, &immediates_out_spv, &immediates_out_count, &map);
+
+\t\tuint32_t *bindingarray_out_spv = nullptr;
+""",
+        """\t\tspirv_webgpu_transform_immediatespatch_alloc(storagecube_out_spv, storagecube_out_count, &immediates_out_spv, &immediates_out_count, &map);
+\t\tstarjunk_capture_probe(i, "immediates", immediates_out_spv, immediates_out_count);
+
+\t\tuint32_t *bindingarray_out_spv = nullptr;
+""",
+    )
+
+    replace_once(
+        shader_container_implementation,
+        """\t\tspirv_webgpu_transform_splitbindingarray_alloc(immediates_out_spv, immediates_out_count, &bindingarray_out_spv, &bindingarray_out_count, &map);
+
+\t\tuint32_t *pruneunuseddref_out_spv = nullptr;
+""",
+        """\t\tspirv_webgpu_transform_splitbindingarray_alloc(immediates_out_spv, immediates_out_count, &bindingarray_out_spv, &bindingarray_out_count, &map);
+\t\tstarjunk_capture_probe(i, "split_binding_array", bindingarray_out_spv, bindingarray_out_count);
+
+\t\tuint32_t *pruneunuseddref_out_spv = nullptr;
+""",
+    )
+
+    replace_once(
+        shader_container_implementation,
+        """\t\tspirv_webgpu_transform_pruneunuseddref_alloc(bindingarray_out_spv, bindingarray_out_count, &pruneunuseddref_out_spv, &pruneunuseddref_out_count);
+
+\t\tVector<uint8_t> out_spirv;
+""",
+        """\t\tspirv_webgpu_transform_pruneunuseddref_alloc(bindingarray_out_spv, bindingarray_out_count, &pruneunuseddref_out_spv, &pruneunuseddref_out_count);
+\t\tstarjunk_capture_probe(i, "prune_unused_dref", pruneunuseddref_out_spv, pruneunuseddref_out_count);
+
+\t\tVector<uint8_t> out_spirv;
+""",
+    )
+
+    replace_once(
+        shader_container_implementation,
+        """\t\tright_spirv.resize(out_right_spirv_count * sizeof(uint32_t));
+\t\tmemcpy(right_spirv.ptrw(), out_right_spirv, right_spirv.size());
+
+\t\t// Right is always right!
+""",
+        """\t\tright_spirv.resize(out_right_spirv_count * sizeof(uint32_t));
+\t\tmemcpy(right_spirv.ptrw(), out_right_spirv, right_spirv.size());
+\t\tstarjunk_capture_probe(0, "mirror_patch", (const uint32_t *)left_spirv.ptr(), left_spirv.size() / sizeof(uint32_t));
+\t\tstarjunk_capture_probe(1, "mirror_patch", (const uint32_t *)right_spirv.ptr(), right_spirv.size() / sizeof(uint32_t));
+
+\t\t// Right is always right!
+""",
+    )
+
+    replace_once(
+        shader_container_implementation,
+        """\t\tif (result.error_string != nullptr) {
+\t\t\tERR_PRINT(vformat(
+\t\t\t\t\t"WebGPU WGSL translation failed for %s stage %s at translator step %d: %s",
+\t\t\t\t\tshader_name_str,
+\t\t\t\t\tString(RenderingDeviceCommons::SHADER_STAGE_NAMES[patched[i].shader_stage]),
+\t\t\t\t\t(int)result.failure_stage,
+\t\t\t\t\tString::utf8(result.error_string.ptr())));
+\t\t\treturn false;
+\t\t}
+""",
+        """\t\tif (result.error_string != nullptr) {
+\t\t\tERR_PRINT(vformat(
+\t\t\t\t\t"WebGPU WGSL translation failed for %s stage %s at translator step %d: %s",
+\t\t\t\t\tshader_name_str,
+\t\t\t\t\tString(RenderingDeviceCommons::SHADER_STAGE_NAMES[patched[i].shader_stage]),
+\t\t\t\t\t(int)result.failure_stage,
+\t\t\t\t\tString::utf8(result.error_string.ptr())));
+\t\t\tif (starjunk_probe_shader && i < starjunk_transform_probes.size()) {
+\t\t\t\tfor (const StarjunkTransformProbe &probe : starjunk_transform_probes[i]) {
+\t\t\t\t\tConvertResult probe_result = webgpu_translate_spirv_to_wgsl(
+\t\t\t\t\t\t\t(const uint32_t *)probe.spirv.ptr(),
+\t\t\t\t\t\t\tprobe.spirv.size() / sizeof(uint32_t));
+\t\t\t\t\tif (probe_result.error_string != nullptr) {
+\t\t\t\t\t\tERR_PRINT(vformat(
+\t\t\t\t\t\t\t\t"WebGPU transform probe FAIL for %s stage %s after %s at translator step %d: %s",
+\t\t\t\t\t\t\t\tshader_name_str,
+\t\t\t\t\t\t\t\tString(RenderingDeviceCommons::SHADER_STAGE_NAMES[patched[i].shader_stage]),
+\t\t\t\t\t\t\t\tprobe.name,
+\t\t\t\t\t\t\t\t(int)probe_result.failure_stage,
+\t\t\t\t\t\t\t\tString::utf8(probe_result.error_string.ptr())));
+\t\t\t\t\t} else {
+\t\t\t\t\t\tERR_PRINT(vformat(
+\t\t\t\t\t\t\t\t"WebGPU transform probe PASS for %s stage %s after %s",
+\t\t\t\t\t\t\t\tshader_name_str,
+\t\t\t\t\t\t\t\tString(RenderingDeviceCommons::SHADER_STAGE_NAMES[patched[i].shader_stage]),
+\t\t\t\t\t\t\t\tprobe.name));
+\t\t\t\t\t}
+\t\t\t\t}
+\t\t\t}
+\t\t\treturn false;
+\t\t}
+""",
+    )
+
     print("Applied Starjunk WebGPU 4.7 compatibility patches")
 
 
