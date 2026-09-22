@@ -11,6 +11,7 @@ REQUIRED = [
     "docs/README.md",
     "engine/source-lock.json",
     "engine/patches/spirv-webgpu-transform-fix-opnop.patch",
+    "engine/patches/spirv-webgpu-transform-fix-binding-array-call.patch",
     "tools/engine/apply_starjunk_port_patches.py",
     "tools/engine/prepare_port_candidate.sh",
     "tools/engine/build_webgpu_rust_deps.sh",
@@ -74,10 +75,13 @@ def main() -> None:
             raise SystemExit(f"webgpu_rust_dependencies.{key} is not pinned to a full SHA")
 
     transform_dependency = lock["webgpu_rust_dependencies"]["spirv_webgpu_transform"]
-    expected_transform_patch = "engine/patches/spirv-webgpu-transform-fix-opnop.patch"
-    if transform_dependency.get("patches") != [expected_transform_patch]:
+    expected_transform_patches = [
+        "engine/patches/spirv-webgpu-transform-fix-opnop.patch",
+        "engine/patches/spirv-webgpu-transform-fix-binding-array-call.patch",
+    ]
+    if transform_dependency.get("patches") != expected_transform_patches:
         raise SystemExit(
-            "spirv_webgpu_transform must declare the reviewed OpNop correction patch"
+            "spirv_webgpu_transform must declare the reviewed local patch series"
         )
 
     if lock.get("emscripten") != "6.0.9":
@@ -92,11 +96,24 @@ def main() -> None:
     ):
         raise SystemExit("SPIR-V transform patch must correct OpNop from opcode 1 to 0")
 
+    binding_array_patch = (
+        ROOT / "engine/patches/spirv-webgpu-transform-fix-binding-array-call.patch"
+    ).read_text(encoding="utf-8")
+    for marker in (
+        "An opaque binding-array element may be passed directly to a helper",
+        "function_call_args.contains(&old_result_id)",
+        "Some((result_type_id, result_id))",
+    ):
+        if marker not in binding_array_patch:
+            raise SystemExit(
+                "SPIR-V binding-array patch is missing direct function-call handling"
+            )
+
     rust_build = (ROOT / "tools/engine/build_webgpu_rust_deps.sh").read_text(
         encoding="utf-8"
     )
-    if 'SPIRV_PATCH_REL="${VALUES[4]}"' not in rust_build:
-        raise SystemExit("WebGPU Rust dependency build must read the locked local patch")
+    if 'SPIRV_PATCH_RELS=("${VALUES[@]:4}")' not in rust_build:
+        raise SystemExit("WebGPU Rust dependency build must read the locked patch series")
 
     candidate_workflow = (
         ROOT / ".github/workflows/webgpu-candidate-build.yml"
