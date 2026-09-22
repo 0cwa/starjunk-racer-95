@@ -10,6 +10,7 @@ REQUIRED = [
     "AGENTS.md",
     "docs/README.md",
     "engine/source-lock.json",
+    "engine/patches/spirv-webgpu-transform-fix-opnop.patch",
     "tools/engine/apply_starjunk_port_patches.py",
     "tools/engine/prepare_port_candidate.sh",
     "tools/engine/build_webgpu_rust_deps.sh",
@@ -72,6 +73,21 @@ def main() -> None:
             raise SystemExit(f"webgpu_rust_dependencies.{key} is not pinned to a full SHA")
     if lock.get("emscripten") != "6.0.9":
         raise SystemExit("WebGPU candidate Emscripten must remain pinned to 6.0.9")
+
+    transform_patch = (
+        ROOT / "engine/patches/spirv-webgpu-transform-fix-opnop.patch"
+    ).read_text(encoding="utf-8")
+    if (
+        "-pub const SPV_INSTRUCTION_OP_NOP: u16 = 1;" not in transform_patch
+        or "+pub const SPV_INSTRUCTION_OP_NOP: u16 = 0;" not in transform_patch
+    ):
+        raise SystemExit("SPIR-V transform patch must correct OpNop from opcode 1 to 0")
+
+    rust_build = (ROOT / "tools/engine/build_webgpu_rust_deps.sh").read_text(
+        encoding="utf-8"
+    )
+    if "spirv-webgpu-transform-fix-opnop.patch" not in rust_build:
+        raise SystemExit("WebGPU Rust dependency build must apply the OpNop correction")
 
     network_lock = json.loads(
         (ROOT / "networking/source-lock.json").read_text(encoding="utf-8")
