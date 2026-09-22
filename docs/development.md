@@ -5,10 +5,16 @@
 3. Reconcile issue state with current `main`, open PRs, and exact-head CI.
 4. Make the smallest coherent change.
 5. Run `make check`.
-6. If Godot is available, import/load affected scenes headlessly.
+6. If Godot is available, run `GODOT_BIN=/path/to/godot make godot-test`; use `tools/godot/run_test_suite.py --filter <substring>` for a focused subset while iterating.
 7. For rendering-density changes, run the benchmark on a comparable runner and attach results to the PR.
 8. Update docs/ADRs when architecture changes.
 9. Before ending a substantial development slice, update the affected workstream issue and issue #48 when project-level focus or priority changed.
+
+The unit/integration suite is declared in `tools/godot/test_suite.json`. `make check`
+compares that manifest with every `game/tests/unit/**/*_test.tscn` and
+`game/tests/integration/**/*_test.tscn` scene, so adding a test without registering
+it fails fast before CI. Characterization, export, and performance scenes remain
+separate gates because they produce artifacts or have different execution semantics.
 
 ## Git and Backstitch
 
