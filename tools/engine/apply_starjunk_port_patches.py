@@ -906,7 +906,7 @@ static const char WEBGPU_WGSL_PRELUDE[] =
 \t\t\tERR_PRINT(vformat(
 \t\t\t\t\t"WebGPU WGSL translation failed for %s stage %s at translator step %d: %s",
 \t\t\t\t\tshader_name_str,
-\t\t\t\t\tString(SHADER_STAGE_NAMES[patched[i].shader_stage]),
+\t\t\t\t\tString(RenderingDeviceCommons::SHADER_STAGE_NAMES[patched[i].shader_stage]),
 \t\t\t\t\t(int)result.failure_stage,
 \t\t\t\t\tString::utf8(result.error_string.ptr())));
 \t\t\treturn false;
