@@ -10,6 +10,7 @@ check:
 	bash -n tools/engine/build_webgpu_rust_deps.sh
 	bash -n tools/engine/forward_port_probe.sh
 	bash -n tools/engine/export_webgpu_benchmark.sh
+	bash -n tools/engine/analyze_spirv_dumps.sh
 	bash -n tools/networking/package_spritely_web.sh
 	python3 -m py_compile tools/engine/apply_starjunk_port_patches.py tools/perf/webgpu_browser_smoke.py
 
