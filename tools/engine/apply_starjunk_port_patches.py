@@ -27,6 +27,7 @@ def main() -> None:
     header = source / "drivers/webgpu/rendering_device_driver_webgpu.h"
     device_implementation = source / "drivers/webgpu/rendering_device_driver_webgpu.cpp"
     shader_container_implementation = source / "drivers/webgpu/rendering_shader_container_webgpu.cpp"
+    translate_implementation = source / "drivers/webgpu/webgpu_translate.cpp"
     context_implementation = source / "drivers/webgpu/rendering_context_driver_webgpu.cpp"
     platform_header = source / "drivers/webgpu/webgpu_platform.h"
     main_implementation = source / "main/main.cpp"
@@ -910,6 +911,47 @@ static const char WEBGPU_WGSL_PRELUDE[] =
 \t\t\t\t\tString::utf8(result.error_string.ptr())));
 \t\t\treturn false;
 \t\t}
+""",
+    )
+
+    # Preserve translator failure stage for front-end and validation failures.
+    # The bridge only populated failure_stage for WGSL back-end failures, which
+    # makes earlier failures appear as NONE/0 in diagnostics.
+    replace_once(
+        translate_implementation,
+        """\tif (!success) {
+\t\treturn (ConvertResult){
+\t\t\t.wgsl_string = nullptr,
+\t\t\t.error_string = strdup(front_result.fmt_error),
+\t\t};
+\t}
+""",
+        """\tif (!success) {
+\t\treturn (ConvertResult){
+\t\t\t.wgsl_string = nullptr,
+\t\t\t.error_string = strdup(front_result.fmt_error),
+\t\t\t.failure_stage = stage,
+\t\t};
+\t}
+""",
+    )
+
+    replace_once(
+        translate_implementation,
+        """\tif (!success) {
+\t\treturn (ConvertResult){
+\t\t\t.wgsl_string = nullptr,
+\t\t\t.error_string = strdup(valid_result.fmt_error),
+\t\t};
+\t}
+""",
+        """\tif (!success) {
+\t\treturn (ConvertResult){
+\t\t\t.wgsl_string = nullptr,
+\t\t\t.error_string = strdup(valid_result.fmt_error),
+\t\t\t.failure_stage = stage,
+\t\t};
+\t}
 """,
     )
 
