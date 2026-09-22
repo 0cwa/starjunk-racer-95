@@ -51,6 +51,18 @@ clone_at() {
 clone_at "$NAGA_REPO" "$NAGA_SHA" "$WORK_ROOT/naga-native"
 clone_at "$SPIRV_REPO" "$SPIRV_SHA" "$WORK_ROOT/spirv-webgpu-transform"
 
+# The pinned transform library accidentally aliases OpNop to opcode 1, which is
+# OpUndef in SPIR-V. Its shared prune_noops() therefore deletes legitimate
+# OpUndef definitions from transformed shaders and leaves dangling result IDs.
+# Keep the upstream revision pinned, but apply the smallest reviewed source
+# correction before building so dependency identity and local compatibility
+# changes remain separately auditable.
+SPIRV_TRANSFORM_PATCH="$ROOT/engine/patches/spirv-webgpu-transform-fix-opnop.patch"
+git -C "$WORK_ROOT/spirv-webgpu-transform" apply --check "$SPIRV_TRANSFORM_PATCH"
+git -C "$WORK_ROOT/spirv-webgpu-transform" apply "$SPIRV_TRANSFORM_PATCH"
+grep -Fq 'pub const SPV_INSTRUCTION_OP_NOP: u16 = 0;' \
+  "$WORK_ROOT/spirv-webgpu-transform/src/spv.rs"
+
 rustup target add wasm32-unknown-emscripten
 
 # naga-native generates Rust FFI bindings from its C header during the build.
