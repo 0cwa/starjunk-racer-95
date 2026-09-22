@@ -9,6 +9,7 @@ check:
 	bash -n tools/engine/prepare_port_candidate.sh
 	bash -n tools/engine/build_webgpu_rust_deps.sh
 	git apply --numstat engine/patches/spirv-webgpu-transform-fix-opnop.patch >/dev/null
+	git apply --numstat engine/patches/spirv-webgpu-transform-fix-binding-array-call.patch >/dev/null
 	bash -n tools/engine/forward_port_probe.sh
 	bash -n tools/engine/export_webgpu_benchmark.sh
 	bash -n tools/engine/analyze_spirv_dumps.sh
