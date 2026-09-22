@@ -22,6 +22,10 @@ print(deps["naga_native"]["repository"])
 print(deps["naga_native"]["commit"])
 print(deps["spirv_webgpu_transform"]["repository"])
 print(deps["spirv_webgpu_transform"]["commit"])
+patches = deps["spirv_webgpu_transform"].get("patches", [])
+if len(patches) != 1:
+    raise SystemExit("spirv_webgpu_transform must declare exactly one reviewed local patch")
+print(patches[0])
 PY
 )
 
@@ -29,6 +33,7 @@ NAGA_REPO="${VALUES[0]}"
 NAGA_SHA="${VALUES[1]}"
 SPIRV_REPO="${VALUES[2]}"
 SPIRV_SHA="${VALUES[3]}"
+SPIRV_PATCH_REL="${VALUES[4]}"
 
 # The Godot bridge deliberately carries TAG files instead of the archives.
 # Refuse to build if its declared dependency identity differs from our lock.
@@ -57,7 +62,7 @@ clone_at "$SPIRV_REPO" "$SPIRV_SHA" "$WORK_ROOT/spirv-webgpu-transform"
 # Keep the upstream revision pinned, but apply the smallest reviewed source
 # correction before building so dependency identity and local compatibility
 # changes remain separately auditable.
-SPIRV_TRANSFORM_PATCH="$ROOT/engine/patches/spirv-webgpu-transform-fix-opnop.patch"
+SPIRV_TRANSFORM_PATCH="$ROOT/$SPIRV_PATCH_REL"
 git -C "$WORK_ROOT/spirv-webgpu-transform" apply --check "$SPIRV_TRANSFORM_PATCH"
 git -C "$WORK_ROOT/spirv-webgpu-transform" apply "$SPIRV_TRANSFORM_PATCH"
 grep -Fq 'pub const SPV_INSTRUCTION_OP_NOP: u16 = 0;' \
