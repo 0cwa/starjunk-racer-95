@@ -1,0 +1,64 @@
+name: WebGPU Template Replay
+
+on:
+  push:
+    branches:
+      - agent/web-playable-demo
+    paths:
+      - ".github/workflows/webgpu-template-replay.yml"
+      - "tools/perf/webgpu_browser_smoke.py"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install browser harness dependency
+        run: python3 -m pip install websocket-client
+      - name: Download known custom WebGPU template
+        uses: actions/download-artifact@v4
+        with:
+          name: godot-4.7.2-webgpu-template
+          path: build/replay-template
+          run-id: 35673516500
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download upstream Godot editor for export
+        env:
+          GODOT_VERSION: "4.7.2"
+        run: |
+          curl -fL --retry 3 -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /tmp/godot-editor
+          chmod +x /tmp/godot-editor/Godot_v${GODOT_VERSION}-stable_linux.x86_64
+          echo "GODOT_BIN=/tmp/godot-editor/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Export lightweight boot scene with known template
+        run: |
+          test -s build/replay-template/godot.web.template_release.wasm32.nothreads.zip
+          tools/engine/export_webgpu_benchmark.sh \
+            "$GODOT_BIN" \
+            "$GITHUB_WORKSPACE/build/replay-template/godot.web.template_release.wasm32.nothreads.zip" \
+            "$GITHUB_WORKSPACE/build/webgpu-replay" \
+            "res://tests/perf/webgpu_boot/webgpu_boot.tscn"
+      - name: Replay Chromium with full translator diagnostics
+        run: |
+          python3 tools/perf/webgpu_browser_smoke.py \
+            --root build/webgpu-replay \
+            --output build/webgpu-template-replay.json \
+            --result-global __STARJUNK_BOOT_RESULT__ \
+            --purpose browser_webgpu_template_replay \
+            --expected-profile boot \
+            --timeout 45
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: webgpu-template-replay
+          path: build/webgpu-template-replay.json
+          if-no-files-found: warn
