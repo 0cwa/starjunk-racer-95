@@ -97,6 +97,12 @@ def main() -> None:
     if 'SPIRV_PATCH_REL="${VALUES[4]}"' not in rust_build:
         raise SystemExit("WebGPU Rust dependency build must read the locked local patch")
 
+    candidate_workflow = (
+        ROOT / ".github/workflows/webgpu-candidate-build.yml"
+    ).read_text(encoding="utf-8")
+    if "'engine/patches/*.patch'" not in candidate_workflow:
+        raise SystemExit("WebGPU candidate cache key must include local patch contents")
+
     network_lock = json.loads(
         (ROOT / "networking/source-lock.json").read_text(encoding="utf-8")
     )
