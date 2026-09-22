@@ -47,7 +47,7 @@ jobs:
           path: |
             .cache/scons-godot-webgpu
             .cache/cargo-webgpu
-          key: webgpu-${{ runner.os }}-toolchain-${{ env.EM_VERSION }}-${{ hashFiles('engine/source-lock.json', 'tools/engine/apply_starjunk_port_patches.py', 'tools/engine/build_webgpu_rust_deps.sh') }}
+          key: webgpu-${{ runner.os }}-toolchain-${{ env.EM_VERSION }}-${{ hashFiles('engine/source-lock.json', 'engine/patches/*.patch', 'tools/engine/apply_starjunk_port_patches.py', 'tools/engine/build_webgpu_rust_deps.sh') }}
           restore-keys: |
             webgpu-${{ runner.os }}-toolchain-${{ env.EM_VERSION }}-
       - uses: actions/setup-python@v5
