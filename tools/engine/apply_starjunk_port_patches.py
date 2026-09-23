@@ -1299,6 +1299,121 @@ ConvertResult webgpu_translate_spirv_to_wgsl(const uint32_t *spv, uint32_t spv_c
 """,
     )
 
+
+    # The legacy backend stores persistent dynamic-buffer frames contiguously at
+    # the logical slice size. WebGPU dynamic uniform/storage offsets must be
+    # 256-byte aligned, so sizes such as 2848 produce invalid offsets (5696 for
+    # frame 2). Preserve the logical binding size but use an aligned frame stride.
+    replace_once(
+        device_implementation,
+        """\tconst uint64_t slice_size = p_size;
+\tconst uint64_t alloc_size = is_dynamic ? slice_size * frame_count : slice_size;
+""",
+        """\tconst uint64_t slice_size = p_size;
+\t// WebGPU dynamic offsets are required to be 256-byte aligned. Keep the
+\t// logical slice size for binding ranges, but separate frame slices by an
+\t// aligned stride so frame_idx never produces an invalid dynamic offset.
+\tconst uint64_t slice_stride = is_dynamic ? STEPIFY(slice_size, 256) : slice_size;
+\tconst uint64_t alloc_size = is_dynamic ? slice_stride * frame_count : slice_size;
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """\t\tdyn->persistent_size = slice_size * frame_count;
+""",
+        """\t\tdyn->persistent_size = slice_stride * frame_count;
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """\treturn dyn->persistent_ptr + dyn->frame_idx * dyn->size;
+""",
+        """\tconst uint64_t slice_stride = dyn->persistent_size / frame_count;
+\treturn dyn->persistent_ptr + dyn->frame_idx * slice_stride;
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """\tfor (BufferDynamicInfo *dyn : dirty_dynamic_buffers) {
+\t\tconst uint64_t offset = dyn->frame_idx * dyn->size;
+\t\twgpuQueueWriteBuffer(queue, dyn->buffer, offset, dyn->persistent_ptr + offset, dyn->size);
+\t}
+""",
+        """\tfor (BufferDynamicInfo *dyn : dirty_dynamic_buffers) {
+\t\tconst uint64_t slice_stride = dyn->persistent_size / frame_count;
+\t\tconst uint64_t offset = dyn->frame_idx * slice_stride;
+\t\twgpuQueueWriteBuffer(queue, dyn->buffer, offset, dyn->persistent_ptr + offset, dyn->size);
+\t}
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """\t\t// Peel one slot per dynamic binding and convert frame_idx -> byte offset.
+\t\tfor (const BufferDynamicInfo *dyn : uniform_set_info->dynamic_buffers) {
+\t\t\tuint32_t frame_idx = (p_dynamic_offsets >> shift) & UNIFORM_DYN_MASK;
+\t\t\tshift += UNIFORM_DYN_BITS;
+\t\t\tcmd.dynamic_offsets.push_back(uint32_t(frame_idx * dyn->size));
+\t\t}
+""",
+        """\t\t// Peel one slot per dynamic binding and convert frame_idx -> aligned byte offset.
+\t\tfor (const BufferDynamicInfo *dyn : uniform_set_info->dynamic_buffers) {
+\t\t\tuint32_t frame_idx = (p_dynamic_offsets >> shift) & UNIFORM_DYN_MASK;
+\t\t\tshift += UNIFORM_DYN_BITS;
+\t\t\tconst uint64_t slice_stride = dyn->persistent_size / frame_count;
+\t\t\tcmd.dynamic_offsets.push_back(uint32_t(frame_idx * slice_stride));
+\t\t}
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """\t\tfor (const BufferDynamicInfo *dyn : uniform_set_info->dynamic_buffers) {
+\t\t\tuint32_t frame_idx = (p_dynamic_offsets >> shift) & UNIFORM_DYN_MASK;
+\t\t\tshift += UNIFORM_DYN_BITS;
+\t\t\tcmd.dynamic_offsets.push_back(uint32_t(frame_idx * dyn->size));
+\t\t}
+\t\tcommand_buffer_info->commands.push_back(cmd);
+\t}
+}
+
+// Dispatching.
+""",
+        """\t\tfor (const BufferDynamicInfo *dyn : uniform_set_info->dynamic_buffers) {
+\t\t\tuint32_t frame_idx = (p_dynamic_offsets >> shift) & UNIFORM_DYN_MASK;
+\t\t\tshift += UNIFORM_DYN_BITS;
+\t\t\tconst uint64_t slice_stride = dyn->persistent_size / frame_count;
+\t\t\tcmd.dynamic_offsets.push_back(uint32_t(frame_idx * slice_stride));
+\t\t}
+\t\tcommand_buffer_info->commands.push_back(cmd);
+\t}
+}
+
+// Dispatching.
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """\t\tif (buffer_info->is_dynamic()) {
+\t\t\tuint64_t frame_idx = p_dynamic_offsets & VERTEX_DYN_MASK;
+\t\t\tp_dynamic_offsets >>= VERTEX_DYN_BITS;
+\t\t\toffset += frame_idx * buffer_info->size;
+\t\t}
+""",
+        """\t\tif (buffer_info->is_dynamic()) {
+\t\t\tuint64_t frame_idx = p_dynamic_offsets & VERTEX_DYN_MASK;
+\t\t\tp_dynamic_offsets >>= VERTEX_DYN_BITS;
+\t\t\tconst BufferDynamicInfo *dyn = static_cast<const BufferDynamicInfo *>(buffer_info);
+\t\t\tconst uint64_t slice_stride = dyn->persistent_size / frame_count;
+\t\t\toffset += frame_idx * slice_stride;
+\t\t}
+""",
+    )
+
     print("Applied Starjunk WebGPU 4.7 compatibility patches")
 
 
