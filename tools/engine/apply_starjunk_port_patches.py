@@ -19,6 +19,14 @@ def replace_once(path: Path, old: str, new: str) -> None:
     path.write_text(source.replace(old, new, 1), encoding="utf-8")
 
 
+def replace_exact_count(path: Path, old: str, new: str, expected: int) -> None:
+    source = path.read_text(encoding="utf-8")
+    count = source.count(old)
+    if count != expected:
+        raise SystemExit(f"{path}: expected {expected} patch anchors, found {count}")
+    path.write_text(source.replace(old, new), encoding="utf-8")
+
+
 def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit("usage: apply_starjunk_port_patches.py GODOT_SOURCE")
@@ -33,6 +41,8 @@ def main() -> None:
     main_implementation = source / "main/main.cpp"
     forward_mobile_implementation = source / "servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp"
     forward_mobile_shader_include = source / "servers/rendering/renderer_rd/shaders/forward_mobile/scene_forward_mobile_inc.glsl"
+    smaa_edge_shader = source / "servers/rendering/renderer_rd/shaders/effects/smaa_edge_detection.glsl"
+    smaa_weight_shader = source / "servers/rendering/renderer_rd/shaders/effects/smaa_weight_calculation.glsl"
 
     replace_once(
         device_implementation,
@@ -711,6 +721,46 @@ static const char WEBGPU_WGSL_PRELUDE[] =
         """\t\t// HACK: Requires vertex writable storage.
 """,
     )
+
+    # Pinned Naga rejects array-valued user stage I/O even though Vulkan SPIR-V
+    # accepts a vec4[3] varying at one base location. SMAA only ever indexes the
+    # three elements statically, so flatten them to explicit locations while
+    # preserving the same location footprint (Edge 1..3, Weight 2..4).
+    replace_once(
+        smaa_edge_shader,
+        "layout(location = 1) out vec4 offset[3];",
+        """layout(location = 1) out vec4 offset0;
+layout(location = 2) out vec4 offset1;
+layout(location = 3) out vec4 offset2;""",
+    )
+    replace_once(
+        smaa_edge_shader,
+        "layout(location = 1) in vec4 offset[3];",
+        """layout(location = 1) in vec4 offset0;
+layout(location = 2) in vec4 offset1;
+layout(location = 3) in vec4 offset2;""",
+    )
+    replace_exact_count(smaa_edge_shader, "offset[0]", "offset0", 3)
+    replace_exact_count(smaa_edge_shader, "offset[1]", "offset1", 3)
+    replace_exact_count(smaa_edge_shader, "offset[2]", "offset2", 3)
+
+    replace_once(
+        smaa_weight_shader,
+        "layout(location = 2) out vec4 offset[3];",
+        """layout(location = 2) out vec4 offset0;
+layout(location = 3) out vec4 offset1;
+layout(location = 4) out vec4 offset2;""",
+    )
+    replace_once(
+        smaa_weight_shader,
+        "layout(location = 2) in vec4 offset[3];",
+        """layout(location = 2) in vec4 offset0;
+layout(location = 3) in vec4 offset1;
+layout(location = 4) in vec4 offset2;""",
+    )
+    replace_exact_count(smaa_weight_shader, "offset[0]", "offset0", 5)
+    replace_exact_count(smaa_weight_shader, "offset[1]", "offset1", 5)
+    replace_exact_count(smaa_weight_shader, "offset[2]", "offset2", 5)
 
     # Browser WebGPU exposes texture-component-swizzle as an optional feature.
     # Keep the browser device portable by requesting it only when advertised.
