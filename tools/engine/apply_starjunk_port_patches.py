@@ -695,10 +695,12 @@ static const char WEBGPU_WGSL_PRELUDE[] =
     )
 
 
-    # The legacy bridge intentionally refused CubeToDp even though the shader
-    # is a regular cubemap sample + fragment-depth pass. The polished WebGPU
-    # reference has no such exclusion, and refusing it leaves Mobile with a
-    # permanently null pipeline.
+    # The legacy bridge intentionally refused CubeToDp and Bokeh DOF before
+    # attempting translation. The polished WebGPU reference has no such shader
+    # exclusions, and Godot eagerly initializes raster Bokeh on Mobile even
+    # when a scene does not enable DOF. Let both shaders flow through the normal
+    # transform/translator path so unsupported constructs fail with actionable
+    # diagnostics rather than leaving permanently null pipelines.
     replace_once(
         shader_container_implementation,
         """\t\t"BokehDofRasterShaderRD:0",
@@ -706,9 +708,7 @@ static const char WEBGPU_WGSL_PRELUDE[] =
 
 \t\t// HACK: Requires vertex writable storage.
 """,
-        """\t\t"BokehDofRasterShaderRD:0",
-
-\t\t// HACK: Requires vertex writable storage.
+        """\t\t// HACK: Requires vertex writable storage.
 """,
     )
 
