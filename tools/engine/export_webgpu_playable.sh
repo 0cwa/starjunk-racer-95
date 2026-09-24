@@ -40,7 +40,7 @@ web_text_driver = sys.argv[6]
 
 if web_renderer not in ("mobile", "gl_compatibility"):
     raise SystemExit(f"unsupported Web renderer: {web_renderer}")
-if web_text_driver not in ("", "Fallback", "Advanced"):
+if web_text_driver not in ("", "Fallback (Built-in)", "ICU / HarfBuzz / Graphite (Built-in)"):
     raise SystemExit(f"unsupported text driver: {web_text_driver}")
 
 project = project_path.read_text(encoding="utf-8")
