@@ -85,6 +85,7 @@ jobs:
             opengl3=no \
             webgpu=yes \
             webgpu_backend=emdawnwebgpu \
+            module_text_server_fb_enabled=yes \
             dlink_enabled=no \
             lto=none \
             debug_symbols=no \
