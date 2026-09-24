@@ -104,7 +104,7 @@ A future multiplayer room can therefore bind a capability reference to a specifi
 
 ## Song-reactive presentation
 
-Tracks can optionally reference a declarative `starjunk95/cue-set/1` JSON file. `SongCueTimeline` validates the cue set, sorts equal-time cues deterministically by ID, and advances presentation events from song time.
+Tracks can optionally reference a package-relative declarative `starjunk95/cue-set/1` JSON file. `CommunityTrackImporter` reads it with a 2 MiB cap, requires a JSON object, validates every cue through `SongCueTimeline`, and rejects the entire track before mounting if presentation data is invalid. The validated cue set travels inside `CommunityRaceBundle` and is automatically configured when the playable race mounts the track.
 
 Cue events are deliberately presentation-only: palette, lighting, particles, scenery phase changes, post-processing and beat markers. They do not alter vehicle physics, collision, checkpoints, lap state or capability authority. Seeking the music resets timeline position without replaying every earlier cue; callers decide whether to reconstruct presentation state from persistent theme data.
 
@@ -117,3 +117,6 @@ If programmable mods are introduced, they must run in a sandbox with explicit ca
 ## Decentralized sharing
 
 Spritely-style object capabilities are a natural fit for sharing/forking/publishing content references. Storage/distribution details must remain behind the content service boundary so packages can also be imported from local files.
+
+
+A community cue file is part of the package's content identity. Changing only song timing/presentation changes the track SHA-256 content ID just like changing geometry or checkpoints. Switching tracks clears transient/persistent presentation state back to game-owned baselines before the new cue set is applied.

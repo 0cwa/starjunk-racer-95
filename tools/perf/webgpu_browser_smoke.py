@@ -192,9 +192,13 @@ def write_spirv_dumps(events: list[dict], dump_dir: Path | None) -> list[dict]:
             parts = encoded.split("|", 5)
             if len(parts) != 6:
                 continue
-            shader_name, stage_text, kind, chunk_text, total_text, chunk_data = (
-                part.strip() for part in parts
-            )
+            shader_name, stage_text, kind, chunk_text, total_text, chunk_data = parts
+            # Godot print_line() inserts spaces between Variant arguments. Accept
+            # both the current spaced console form and a future concatenated
+            # emitter without letting formatting whitespace corrupt base64.
+            shader_name = shader_name.strip()
+            kind = kind.strip()
+            chunk_data = chunk_data.strip()
             try:
                 stage = int(stage_text)
                 chunk_index = int(chunk_text)
@@ -232,6 +236,7 @@ def write_spirv_dumps(events: list[dict], dump_dir: Path | None) -> list[dict]:
                 raw = base64.b64decode("".join(chunks[i] for i in range(total)), validate=True)
             except Exception as exc:
                 summary["decode_error"] = str(exc)
+                complete = False
                 summary["complete"] = False
             else:
                 digest = hashlib.sha256(raw).hexdigest()
@@ -667,6 +672,7 @@ window.addEventListener('unhandledrejection', (event) => {
             "cdp_events": event_summary,
             "browser_events": browser_events[-120:],
             "required_console_results": required_console_results,
+            "spirv_dumps": spirv_dumps,
         }
 
         validation_errors: list[str] = []

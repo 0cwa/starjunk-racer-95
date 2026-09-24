@@ -19,6 +19,14 @@ def replace_once(path: Path, old: str, new: str) -> None:
     path.write_text(source.replace(old, new, 1), encoding="utf-8")
 
 
+def replace_exact_count(path: Path, old: str, new: str, expected: int) -> None:
+    source = path.read_text(encoding="utf-8")
+    count = source.count(old)
+    if count != expected:
+        raise SystemExit(f"{path}: expected {expected} patch anchors, found {count}")
+    path.write_text(source.replace(old, new), encoding="utf-8")
+
+
 def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit("usage: apply_starjunk_port_patches.py GODOT_SOURCE")
@@ -32,6 +40,9 @@ def main() -> None:
     platform_header = source / "drivers/webgpu/webgpu_platform.h"
     main_implementation = source / "main/main.cpp"
     forward_mobile_implementation = source / "servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp"
+    forward_mobile_shader_include = source / "servers/rendering/renderer_rd/shaders/forward_mobile/scene_forward_mobile_inc.glsl"
+    smaa_edge_shader = source / "servers/rendering/renderer_rd/shaders/effects/smaa_edge_detection.glsl"
+    smaa_weight_shader = source / "servers/rendering/renderer_rd/shaders/effects/smaa_weight_calculation.glsl"
 
     replace_once(
         device_implementation,
@@ -694,10 +705,12 @@ static const char WEBGPU_WGSL_PRELUDE[] =
     )
 
 
-    # The legacy bridge intentionally refused CubeToDp even though the shader
-    # is a regular cubemap sample + fragment-depth pass. The polished WebGPU
-    # reference has no such exclusion, and refusing it leaves Mobile with a
-    # permanently null pipeline.
+    # The legacy bridge intentionally refused CubeToDp and Bokeh DOF before
+    # attempting translation. The polished WebGPU reference has no such shader
+    # exclusions, and Godot eagerly initializes raster Bokeh on Mobile even
+    # when a scene does not enable DOF. Let both shaders flow through the normal
+    # transform/translator path so unsupported constructs fail with actionable
+    # diagnostics rather than leaving permanently null pipelines.
     replace_once(
         shader_container_implementation,
         """\t\t"BokehDofRasterShaderRD:0",
@@ -705,11 +718,49 @@ static const char WEBGPU_WGSL_PRELUDE[] =
 
 \t\t// HACK: Requires vertex writable storage.
 """,
-        """\t\t"BokehDofRasterShaderRD:0",
-
-\t\t// HACK: Requires vertex writable storage.
+        """\t\t// HACK: Requires vertex writable storage.
 """,
     )
+
+    # Pinned Naga rejects array-valued user stage I/O even though Vulkan SPIR-V
+    # accepts a vec4[3] varying at one base location. SMAA only ever indexes the
+    # three elements statically, so flatten them to explicit locations while
+    # preserving the same location footprint (Edge 1..3, Weight 2..4).
+    replace_once(
+        smaa_edge_shader,
+        "layout(location = 1) out vec4 offset[3];",
+        """layout(location = 1) out vec4 offset0;
+layout(location = 2) out vec4 offset1;
+layout(location = 3) out vec4 offset2;""",
+    )
+    replace_once(
+        smaa_edge_shader,
+        "layout(location = 1) in vec4 offset[3];",
+        """layout(location = 1) in vec4 offset0;
+layout(location = 2) in vec4 offset1;
+layout(location = 3) in vec4 offset2;""",
+    )
+    replace_exact_count(smaa_edge_shader, "offset[0]", "offset0", 3)
+    replace_exact_count(smaa_edge_shader, "offset[1]", "offset1", 3)
+    replace_exact_count(smaa_edge_shader, "offset[2]", "offset2", 3)
+
+    replace_once(
+        smaa_weight_shader,
+        "layout(location = 2) out vec4 offset[3];",
+        """layout(location = 2) out vec4 offset0;
+layout(location = 3) out vec4 offset1;
+layout(location = 4) out vec4 offset2;""",
+    )
+    replace_once(
+        smaa_weight_shader,
+        "layout(location = 2) in vec4 offset[3];",
+        """layout(location = 2) in vec4 offset0;
+layout(location = 3) in vec4 offset1;
+layout(location = 4) in vec4 offset2;""",
+    )
+    replace_exact_count(smaa_weight_shader, "offset[0]", "offset0", 5)
+    replace_exact_count(smaa_weight_shader, "offset[1]", "offset1", 5)
+    replace_exact_count(smaa_weight_shader, "offset[2]", "offset2", 5)
 
     # Browser WebGPU exposes texture-component-swizzle as an optional feature.
     # Keep the browser device portable by requesting it only when advertised.
@@ -1261,6 +1312,155 @@ ConvertResult webgpu_translate_spirv_to_wgsl(const uint32_t *spv, uint32_t spv_c
 
 \t\t\tERR_PRINT(vformat(
 \t\t\t\t\t"WebGPU WGSL translation failed for %s stage %s at translator step %d: %s",
+""",
+    )
+
+    # shader_count_for() only packs NONE/SINGLE/MULTIPLE (0/1/2), but the
+    # GLSL helper has no syntactic fallback for the unused 2-bit value 3.
+    # Vulkan accepts the resulting OpUndef return path; the pinned legacy Naga
+    # validator rejects the otherwise-valid helper. Give the unreachable state
+    # deterministic NONE semantics so WebGPU translation has total control flow.
+    replace_once(
+        forward_mobile_shader_include,
+        """uint option_to_count(uint option, uint bound) {
+\tswitch (option) {
+\t\tcase SHADER_COUNT_NONE:
+\t\t\treturn 0;
+\t\tcase SHADER_COUNT_SINGLE:
+\t\t\treturn 1;
+\t\tcase SHADER_COUNT_MULTIPLE:
+\t\t\treturn bound;
+\t}
+}
+""",
+        """uint option_to_count(uint option, uint bound) {
+\tswitch (option) {
+\t\tcase SHADER_COUNT_NONE:
+\t\t\treturn 0;
+\t\tcase SHADER_COUNT_SINGLE:
+\t\t\treturn 1;
+\t\tcase SHADER_COUNT_MULTIPLE:
+\t\t\treturn bound;
+\t}
+\t// The C++ specialization packer only emits values 0..2. Keep the unused
+\t// value deterministic for WebGPU translators that require total returns.
+\treturn 0;
+}
+""",
+    )
+
+
+    # The legacy backend stores persistent dynamic-buffer frames contiguously at
+    # the logical slice size. WebGPU dynamic uniform/storage offsets must be
+    # 256-byte aligned, so sizes such as 2848 produce invalid offsets (5696 for
+    # frame 2). Preserve the logical binding size but use an aligned frame stride.
+    replace_once(
+        device_implementation,
+        """\tconst uint64_t slice_size = p_size;
+\tconst uint64_t alloc_size = is_dynamic ? slice_size * frame_count : slice_size;
+""",
+        """\tconst uint64_t slice_size = p_size;
+\t// WebGPU dynamic offsets are required to be 256-byte aligned. Keep the
+\t// logical slice size for binding ranges, but separate frame slices by an
+\t// aligned stride so frame_idx never produces an invalid dynamic offset.
+\tconst uint64_t slice_stride = is_dynamic ? STEPIFY(slice_size, 256) : slice_size;
+\tconst uint64_t alloc_size = is_dynamic ? slice_stride * frame_count : slice_size;
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """\t\tdyn->persistent_size = slice_size * frame_count;
+""",
+        """\t\tdyn->persistent_size = slice_stride * frame_count;
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """\treturn dyn->persistent_ptr + dyn->frame_idx * dyn->size;
+""",
+        """\tconst uint64_t slice_stride = dyn->persistent_size / frame_count;
+\treturn dyn->persistent_ptr + dyn->frame_idx * slice_stride;
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """\tfor (BufferDynamicInfo *dyn : dirty_dynamic_buffers) {
+\t\tconst uint64_t offset = dyn->frame_idx * dyn->size;
+\t\twgpuQueueWriteBuffer(queue, dyn->buffer, offset, dyn->persistent_ptr + offset, dyn->size);
+\t}
+""",
+        """\tfor (BufferDynamicInfo *dyn : dirty_dynamic_buffers) {
+\t\tconst uint64_t slice_stride = dyn->persistent_size / frame_count;
+\t\tconst uint64_t offset = dyn->frame_idx * slice_stride;
+\t\twgpuQueueWriteBuffer(queue, dyn->buffer, offset, dyn->persistent_ptr + offset, dyn->size);
+\t}
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """\t\t// Peel one slot per dynamic binding and convert frame_idx -> byte offset.
+\t\tfor (const BufferDynamicInfo *dyn : uniform_set_info->dynamic_buffers) {
+\t\t\tuint32_t frame_idx = (p_dynamic_offsets >> shift) & UNIFORM_DYN_MASK;
+\t\t\tshift += UNIFORM_DYN_BITS;
+\t\t\tcmd.dynamic_offsets.push_back(uint32_t(frame_idx * dyn->size));
+\t\t}
+""",
+        """\t\t// Peel one slot per dynamic binding and convert frame_idx -> aligned byte offset.
+\t\tfor (const BufferDynamicInfo *dyn : uniform_set_info->dynamic_buffers) {
+\t\t\tuint32_t frame_idx = (p_dynamic_offsets >> shift) & UNIFORM_DYN_MASK;
+\t\t\tshift += UNIFORM_DYN_BITS;
+\t\t\tconst uint64_t slice_stride = dyn->persistent_size / frame_count;
+\t\t\tcmd.dynamic_offsets.push_back(uint32_t(frame_idx * slice_stride));
+\t\t}
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """\t\tfor (const BufferDynamicInfo *dyn : uniform_set_info->dynamic_buffers) {
+\t\t\tuint32_t frame_idx = (p_dynamic_offsets >> shift) & UNIFORM_DYN_MASK;
+\t\t\tshift += UNIFORM_DYN_BITS;
+\t\t\tcmd.dynamic_offsets.push_back(uint32_t(frame_idx * dyn->size));
+\t\t}
+\t\tcommand_buffer_info->commands.push_back(cmd);
+\t}
+}
+
+// Dispatching.
+""",
+        """\t\tfor (const BufferDynamicInfo *dyn : uniform_set_info->dynamic_buffers) {
+\t\t\tuint32_t frame_idx = (p_dynamic_offsets >> shift) & UNIFORM_DYN_MASK;
+\t\t\tshift += UNIFORM_DYN_BITS;
+\t\t\tconst uint64_t slice_stride = dyn->persistent_size / frame_count;
+\t\t\tcmd.dynamic_offsets.push_back(uint32_t(frame_idx * slice_stride));
+\t\t}
+\t\tcommand_buffer_info->commands.push_back(cmd);
+\t}
+}
+
+// Dispatching.
+""",
+    )
+
+    replace_once(
+        device_implementation,
+        """\t\tif (buffer_info->is_dynamic()) {
+\t\t\tuint64_t frame_idx = p_dynamic_offsets & VERTEX_DYN_MASK;
+\t\t\tp_dynamic_offsets >>= VERTEX_DYN_BITS;
+\t\t\toffset += frame_idx * buffer_info->size;
+\t\t}
+""",
+        """\t\tif (buffer_info->is_dynamic()) {
+\t\t\tuint64_t frame_idx = p_dynamic_offsets & VERTEX_DYN_MASK;
+\t\t\tp_dynamic_offsets >>= VERTEX_DYN_BITS;
+\t\t\tconst BufferDynamicInfo *dyn = static_cast<const BufferDynamicInfo *>(buffer_info);
+\t\t\tconst uint64_t slice_stride = dyn->persistent_size / frame_count;
+\t\t\toffset += frame_idx * slice_stride;
+\t\t}
 """,
     )
 
