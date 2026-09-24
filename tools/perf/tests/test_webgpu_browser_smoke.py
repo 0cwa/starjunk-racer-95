@@ -11,6 +11,7 @@ from tools.perf.webgpu_browser_smoke import (
     console_json_from_event,
     extract_browser_events,
     find_console_json,
+    renderer_identity_errors,
     write_spirv_dumps,
 )
 
@@ -26,6 +27,37 @@ def console_event(value: str) -> dict:
 
 
 class WebGPUBrowserSmokeParsingTests(unittest.TestCase):
+    def test_renderer_identity_accepts_webgpu_and_compatibility_profiles(self):
+        self.assertEqual(
+            renderer_identity_errors(
+                {"renderer": "mobile", "rendering_driver": "webgpu"},
+                "mobile",
+                "webgpu",
+            ),
+            [],
+        )
+        self.assertEqual(
+            renderer_identity_errors(
+                {"renderer": "gl_compatibility", "rendering_driver": "opengl3"},
+                "gl_compatibility",
+                "opengl3",
+            ),
+            [],
+        )
+
+    def test_renderer_identity_reports_mismatches_once(self):
+        self.assertEqual(
+            renderer_identity_errors(
+                {"renderer": "mobile", "rendering_driver": "webgpu"},
+                "gl_compatibility",
+                "opengl3",
+            ),
+            [
+                "Expected renderer 'gl_compatibility', got 'mobile'",
+                "Expected rendering driver 'opengl3', got 'webgpu'",
+            ],
+        )
+
     def test_playable_result_prefix_is_registered(self):
         self.assertEqual(
             RESULT_CONSOLE_PREFIXES["__STARJUNK_PLAYABLE_RESULT__"],
