@@ -6,6 +6,7 @@ GODOT_BIN="${1:?usage: export_webgpu_playable.sh GODOT_BIN TEMPLATE_ZIP OUTPUT_D
 TEMPLATE_ZIP="${2:?missing template zip}"
 OUTPUT_DIR="${3:?missing output dir}"
 MAIN_SCENE="${4:-}"
+WEB_RENDERER="${STARJUNK_WEB_RENDERER:-mobile}"
 
 test -x "$GODOT_BIN"
 test -s "$TEMPLATE_ZIP"
@@ -23,7 +24,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-python3 - "$PROJECT_FILE" "$PRESET_FILE" "$TEMPLATE_ZIP" "$MAIN_SCENE" "${STARJUNK_WEB_RENDERER:-mobile}" <<'PY'
+python3 - "$PROJECT_FILE" "$PRESET_FILE" "$TEMPLATE_ZIP" "$MAIN_SCENE" "$WEB_RENDERER" <<'PY'
 import re
 import sys
 from pathlib import Path
@@ -33,14 +34,23 @@ preset_path = Path(sys.argv[2])
 template = str(Path(sys.argv[3]).resolve()).replace("\\", "/")
 main_scene = sys.argv[4]
 web_renderer = sys.argv[5]
+
 if web_renderer not in ("mobile", "gl_compatibility"):
     raise SystemExit(f"unsupported Web renderer: {web_renderer}")
 
+project = project_path.read_text(encoding="utf-8")
 if web_renderer == "gl_compatibility":
-    project = project_path.read_text(encoding="utf-8")
     project, substitutions = re.subn(
-        r'^renderer/rendering_method.web="mobile"
-    project = project_path.read_text(encoding="utf-8")
+        r'^renderer/rendering_method.web="mobile"$',
+        'renderer/rendering_method.web="gl_compatibility"',
+        project,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    if substitutions != 1:
+        raise SystemExit("expected exactly one Mobile Web renderer setting")
+
+if main_scene:
     project, substitutions = re.subn(
         r'^run/main_scene="[^"]+"$',
         f'run/main_scene="{main_scene}"',
@@ -52,7 +62,8 @@ if web_renderer == "gl_compatibility":
         raise SystemExit(
             f"expected exactly one main-scene setting, replaced {substitutions}"
         )
-    project_path.write_text(project, encoding="utf-8")
+
+project_path.write_text(project, encoding="utf-8")
 
 preset = preset_path.read_text(encoding="utf-8")
 marker = "[preset.1.options]\n"
@@ -83,59 +94,4 @@ do
 done
 
 printf 'Exported Web playable scene %s with renderer %s to %s\n' \
-  "${MAIN_SCENE:-<project default>}" "${STARJUNK_WEB_RENDERER:-mobile}" "$OUTPUT_DIR"
-,
-        'renderer/rendering_method.web="gl_compatibility"',
-        project,
-        count=1,
-        flags=re.MULTILINE,
-    )
-    if substitutions != 1:
-        raise SystemExit("expected exactly one Mobile Web renderer setting")
-    project_path.write_text(project, encoding="utf-8")
-
-if main_scene:
-    project = project_path.read_text(encoding="utf-8")
-    project, substitutions = re.subn(
-        r'^run/main_scene="[^"]+"$',
-        f'run/main_scene="{main_scene}"',
-        project,
-        count=1,
-        flags=re.MULTILINE,
-    )
-    if substitutions != 1:
-        raise SystemExit(
-            f"expected exactly one main-scene setting, replaced {substitutions}"
-        )
-    project_path.write_text(project, encoding="utf-8")
-
-preset = preset_path.read_text(encoding="utf-8")
-marker = "[preset.1.options]\n"
-if marker not in preset:
-    raise SystemExit("Web Playable preset options section not found")
-custom_line = f'custom_template/release="{template}"\n'
-preset = preset.replace(marker, marker + "\n" + custom_line, 1)
-preset_path.write_text(preset, encoding="utf-8")
-PY
-
-rm -rf "$OUTPUT_DIR"
-mkdir -p "$OUTPUT_DIR"
-
-"$GODOT_BIN" --headless --path "$ROOT/game" --editor --quit-after 2
-"$GODOT_BIN" --headless --path "$ROOT/game" \
-  --export-release "Web Playable" "$OUTPUT_DIR/index.html"
-
-test -s "$OUTPUT_DIR/index.html"
-test -s "$OUTPUT_DIR/index.wasm"
-test -s "$OUTPUT_DIR/index.pck"
-
-for marker in \
-  'spritely/reflect.js' \
-  'globalThis.HootScheme = Scheme' \
-  'spritely/bootstrap.mjs'
-do
-  grep -Fq "$marker" "$OUTPUT_DIR/index.html"
-done
-
-printf 'Exported WebGPU playable scene %s to %s\n' \
-  "${MAIN_SCENE:-<project default>}" "$OUTPUT_DIR"
+  "${MAIN_SCENE:-<project default>}" "$WEB_RENDERER" "$OUTPUT_DIR"
