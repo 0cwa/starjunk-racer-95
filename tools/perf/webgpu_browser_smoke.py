@@ -125,6 +125,24 @@ RESULT_CONSOLE_PREFIXES = {
 }
 
 
+def renderer_identity_errors(payload: dict) -> list[str]:
+    renderer = str(payload.get("renderer", "")).lower()
+    driver = str(payload.get("rendering_driver", "")).lower()
+    rendering_api = str(payload.get("rendering_api", "")).lower()
+    errors: list[str] = []
+    if renderer != "mobile":
+        errors.append(f"Expected Mobile renderer, got {renderer!r}")
+    if driver != "webgpu":
+        errors.append(
+            f"Expected Web rendering driver label 'webgpu', got {driver!r}"
+        )
+    if rendering_api != "webgpu":
+        errors.append(
+            f"Expected RenderingDevice API 'webgpu', got {rendering_api!r}"
+        )
+    return errors
+
+
 def console_values(event: dict) -> list[object]:
     if event.get("method") != "Runtime.consoleAPICalled":
         return []
@@ -658,8 +676,6 @@ window.addEventListener('unhandledrejection', (event) => {
                 required_console_results[prefix] = required_payload
 
         browser_events = extract_browser_events(cdp.events)
-        renderer = str(payload.get("renderer", "")).lower()
-        driver = str(payload.get("rendering_driver", "")).lower()
         event_summary = summarize_cdp_events(cdp.events)
 
         result = {
@@ -675,16 +691,10 @@ window.addEventListener('unhandledrejection', (event) => {
             "spirv_dumps": spirv_dumps,
         }
 
-        validation_errors: list[str] = []
+        validation_errors = renderer_identity_errors(payload)
         for prefix in missing_console_prefixes:
             validation_errors.append(
                 f"Required browser console signal {prefix!r} was not observed"
-            )
-        if renderer != "mobile":
-            validation_errors.append(f"Expected Mobile renderer, got {renderer!r}")
-        if driver != "webgpu":
-            validation_errors.append(
-                f"Expected Web rendering driver label 'webgpu', got {driver!r}"
             )
 
         renderer_errors = list(event_summary.get("renderer_errors", []))
