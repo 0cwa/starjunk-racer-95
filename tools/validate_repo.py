@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -56,6 +57,12 @@ def main() -> None:
     missing = [path for path in REQUIRED if not (ROOT / path).is_file()]
     if missing:
         raise SystemExit("Missing required repository files: " + ", ".join(missing))
+
+    # The candidate workflow invokes this helper directly; a non-executable
+    # Git mode passes shell syntax checks but stops delivery after the build.
+    playable_export = ROOT / "tools/engine/export_webgpu_playable.sh"
+    if not os.access(playable_export, os.X_OK):
+        raise SystemExit(f"WebGPU playable export helper is not executable: {playable_export}")
 
     for path in [
         "engine/source-lock.json",
