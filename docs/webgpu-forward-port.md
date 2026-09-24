@@ -80,24 +80,28 @@ The WebGPU build renders the torture workload correctly in supported desktop bro
 The storage-format promotion pass advanced the Chromium gate through device creation,
 Forward Mobile initialization, and into the GDScript boot scene. The first successful
 boot payload still reported `RenderingServer.get_current_rendering_driver_name()` as
-`"vulkan"`; that value is Godot's OS/display rendering-driver label and is not the
-active RenderingDevice backend identity for this forward-port.
+`"vulkan"`, exposing a missing Web platform driver default rather than a renderer
+failure.
 
-The permanent boot contract now checks
-`RenderingServer.get_rendering_device().get_device_api_name()`, which is implemented
-by the WebGPU driver as `"WebGpu"`. The Chromium smoke artifact is written before
-post-boot assertions so future backend-identity or profile mismatches remain inspectable.
+The compatibility patch now ports the reference's WebGPU driver override and Web
+renderer hint list, so the engine reports the active Web driver as `"webgpu"`.
+The browser bridge does not currently expose a non-null global `RenderingDevice`
+singleton to GDScript, so `RenderingServer.get_rendering_device()` cannot be used as
+an acceptance assertion there; the diagnostic `rendering_api` field may therefore
+remain empty. The Chromium smoke artifact is written before post-boot assertions so
+future identity or profile mismatches remain inspectable.
 
 
 ### Web rendering-driver identity
 
 The bridge fork had WebGPU registered in `DisplayServerWeb` but omitted the
 platform-specific project-setting default that exists in the polished reference:
-`rendering/rendering_device/driver.web = "webgpu"`. As a result, the WebGPU
-RenderingDevice could boot while `RenderingServer.get_current_rendering_driver_name()`
-still reported the generic `"vulkan"` default. That is not only cosmetic: Godot
-uses the current rendering-driver name when defining renderer shader macros.
+`rendering/rendering_device/driver.web = "webgpu"`. As a result, the WebGPU path
+could boot while `RenderingServer.get_current_rendering_driver_name()` still
+reported the generic `"vulkan"` default. That is not only cosmetic: Godot uses the
+current rendering-driver name when defining renderer shader macros.
 
-The compatibility patch now ports the reference's WebGPU driver override and
-Web renderer hint list. The browser boot gate requires both the OS/display driver
-label and `RenderingDevice.get_device_api_name()` to identify WebGPU.
+The browser boot gate therefore requires Mobile plus the observable `"webgpu"`
+rendering-driver label and keeps Chromium WebGPU validation/shader errors fatal. It
+does not manufacture a second identity assertion from the unavailable script-level
+RenderingDevice singleton.
