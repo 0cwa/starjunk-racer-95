@@ -49,6 +49,8 @@ jobs:
           echo 'd3ee2f08cef0cf3cf6678a6355a92a8db48ccdd35cbd2e8bfd5f0e8a0b4032a0  /tmp/godot-web-release.zip' | sha256sum -c -
       - name: Build and validate pinned Spritely Web runtime
         run: networking/spritely/run_spike.sh
+      - name: Return generated build directory to runner user
+        run: sudo chown -R "$(id -u):$(id -g)" build
       - name: Export real PrototypeRace browser smoke
         env:
           STARJUNK_WEB_RENDERER: gl_compatibility
