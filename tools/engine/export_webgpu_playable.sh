@@ -18,6 +18,7 @@ PROJECT_BACKUP="$(mktemp)"
 PRESET_BACKUP="$(mktemp)"
 cp "$PROJECT_FILE" "$PROJECT_BACKUP"
 cp "$PRESET_FILE" "$PRESET_BACKUP"
+
 cleanup() {
   cp "$PROJECT_BACKUP" "$PROJECT_FILE"
   cp "$PRESET_BACKUP" "$PRESET_FILE"
@@ -39,10 +40,10 @@ web_text_driver = sys.argv[6]
 
 if web_renderer not in ("mobile", "gl_compatibility"):
     raise SystemExit(f"unsupported Web renderer: {web_renderer}")
+if web_text_driver not in ("", "Fallback", "Advanced"):
+    raise SystemExit(f"unsupported text driver: {web_text_driver}")
 
 project = project_path.read_text(encoding="utf-8")
-if web_text_driver and web_text_driver not in ("Fallback", "Advanced"):
-    raise SystemExit(f"unsupported text driver: {web_text_driver}")
 
 if web_renderer == "gl_compatibility":
     project, substitutions = re.subn(
@@ -56,17 +57,34 @@ if web_renderer == "gl_compatibility":
         raise SystemExit("expected exactly one Mobile Web renderer setting")
 
 if web_text_driver:
-    section = "[internationalization]"
+    section_header = "[internationalization]"
     setting = f'rendering/text_driver="{web_text_driver}"'
-    if section in project:
-        pattern = r'(?ms)^\[internationalization\]\n(.*?)(?=^\[|\Z)'
-        match = re.search(pattern, project)
-        if match is None:
-            raise SystemExit("unable to parse internationalization project section")
-        body = match.group(1)
+    section_pattern = r'(?ms)^\[internationalization\]\n(.*?)(?=^\[|\Z)'
+    section_match = re.search(section_pattern, project)
+
+    if section_match is None:
+        project = project.rstrip() + f"\n\n{section_header}\n\n{setting}\n"
+    else:
+        body = section_match.group(1)
         if re.search(r'^rendering/text_driver=', body, flags=re.MULTILINE):
             body = re.sub(
-                r'^rendering/text_driver=.*        r'^run/main_scene="[^"]+"$',
+                r'^rendering/text_driver=.*$',
+                setting,
+                body,
+                count=1,
+                flags=re.MULTILINE,
+            )
+        else:
+            body = setting + "\n" + body
+        project = (
+            project[: section_match.start(1)]
+            + body
+            + project[section_match.end(1) :]
+        )
+
+if main_scene:
+    project, substitutions = re.subn(
+        r'^run/main_scene="[^"]+"$',
         f'run/main_scene="{main_scene}"',
         project,
         count=1,
@@ -83,6 +101,7 @@ preset = preset_path.read_text(encoding="utf-8")
 marker = "[preset.1.options]\n"
 if marker not in preset:
     raise SystemExit("Web Playable preset options section not found")
+
 custom_line = f'custom_template/release="{template}"\n'
 preset = preset.replace(marker, marker + "\n" + custom_line, 1)
 preset_path.write_text(preset, encoding="utf-8")
@@ -108,61 +127,7 @@ do
 done
 
 printf 'Exported Web playable scene %s with renderer %s and text driver %s to %s\n' \
-  "${MAIN_SCENE:-<project default>}" "$WEB_RENDERER" "${WEB_TEXT_DRIVER:-<default>}" "$OUTPUT_DIR"
-,
-                setting,
-                body,
-                count=1,
-                flags=re.MULTILINE,
-            )
-        else:
-            body = setting + "\n" + body
-        project = project[:match.start(1)] + body + project[match.end(1):]
-    else:
-        project = project.rstrip() + f"\n\n{section}\n\n{setting}\n"
-
-if main_scene:
-    project, substitutions = re.subn(
-        r'^run/main_scene="[^"]+"$',
-        f'run/main_scene="{main_scene}"',
-        project,
-        count=1,
-        flags=re.MULTILINE,
-    )
-    if substitutions != 1:
-        raise SystemExit(
-            f"expected exactly one main-scene setting, replaced {substitutions}"
-        )
-
-project_path.write_text(project, encoding="utf-8")
-
-preset = preset_path.read_text(encoding="utf-8")
-marker = "[preset.1.options]\n"
-if marker not in preset:
-    raise SystemExit("Web Playable preset options section not found")
-custom_line = f'custom_template/release="{template}"\n'
-preset = preset.replace(marker, marker + "\n" + custom_line, 1)
-preset_path.write_text(preset, encoding="utf-8")
-PY
-
-rm -rf "$OUTPUT_DIR"
-mkdir -p "$OUTPUT_DIR"
-
-"$GODOT_BIN" --headless --path "$ROOT/game" --editor --quit-after 2
-"$GODOT_BIN" --headless --path "$ROOT/game" \
-  --export-release "Web Playable" "$OUTPUT_DIR/index.html"
-
-test -s "$OUTPUT_DIR/index.html"
-test -s "$OUTPUT_DIR/index.wasm"
-test -s "$OUTPUT_DIR/index.pck"
-
-for marker in \
-  'spritely/reflect.js' \
-  'globalThis.HootScheme = Scheme' \
-  'spritely/bootstrap.mjs'
-do
-  grep -Fq "$marker" "$OUTPUT_DIR/index.html"
-done
-
-printf 'Exported Web playable scene %s with renderer %s to %s\n' \
-  "${MAIN_SCENE:-<project default>}" "$WEB_RENDERER" "$OUTPUT_DIR"
+  "${MAIN_SCENE:-<project default>}" \
+  "$WEB_RENDERER" \
+  "${WEB_TEXT_DRIVER:-<default>}" \
+  "$OUTPUT_DIR"
