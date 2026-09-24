@@ -139,6 +139,7 @@ func _write_track_zip() -> bool:
 		"name": "Service Test Track",
 		"environment": "environment.glb",
 		"collision": "collision.glb",
+		"song_cue_set": "cues.json",
 		"checkpoints": [
 			{"id": "start", "position": [0.0, 1.0, 0.0], "size": [5.0, 2.0, 1.0]},
 			{"id": "cp-1", "position": [0.0, 1.0, -10.0], "size": [5.0, 2.0, 1.0]},
@@ -150,7 +151,17 @@ func _write_track_zip() -> bool:
 	if not _write_json(temp_root + "/manifest.json", manifest):
 		_remove_tree(ProjectSettings.globalize_path(temp_root))
 		return false
-	var ok := _zip_directory(temp_root, TRACK_ZIP, ["manifest.json", "environment.glb", "collision.glb"])
+	if not _write_json(temp_root + "/cues.json", {
+		"format": "starjunk95/cue-set/1",
+		"duration_ms": 5000,
+		"cues": [
+			{"id": "palette-0", "time_ms": 0, "kind": "palette", "payload": {"background_color": "#17365d"}},
+			{"id": "glow-1", "time_ms": 1000, "kind": "post_process", "payload": {"glow_intensity": 2.2}},
+		],
+	}):
+		_remove_tree(ProjectSettings.globalize_path(temp_root))
+		return false
+	var ok := _zip_directory(temp_root, TRACK_ZIP, ["manifest.json", "environment.glb", "collision.glb", "cues.json"])
 	_remove_tree(ProjectSettings.globalize_path(temp_root))
 	return ok
 
