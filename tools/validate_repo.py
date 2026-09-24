@@ -27,6 +27,7 @@ REQUIRED = [
     "game/tests/integration/web_playable_smoke_test.tscn",
     ".github/workflows/webgpu-candidate-build.yml",
     ".github/workflows/webgpu-forward-port-probe.yml",
+    ".github/workflows/browser-demo.yml",
     "networking/source-lock.json",
     "networking/spritely/web/bootstrap.mjs",
     "tools/godot/run_test_suite.py",
@@ -133,6 +134,14 @@ def main() -> None:
     ).read_text(encoding="utf-8")
     if "'engine/patches/*.patch'" not in candidate_workflow:
         raise SystemExit("WebGPU candidate cache key must include local patch contents")
+
+    compatibility_workflow = (
+        ROOT / ".github/workflows/browser-demo.yml"
+    ).read_text(encoding="utf-8")
+    if "res://tests/integration/web_playable_smoke_test.tscn" not in compatibility_workflow:
+        raise SystemExit("Compatibility browser demo must export the registered playable smoke")
+    if "res://tests/integration/web_playable_smoke.tscn" in compatibility_workflow:
+        raise SystemExit("Compatibility browser demo references obsolete playable smoke scene")
 
     network_lock = json.loads(
         (ROOT / "networking/source-lock.json").read_text(encoding="utf-8")
