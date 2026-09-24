@@ -3,6 +3,7 @@ extends Node
 const TEMP_ROOT := "user://starjunk-community-track-import-test"
 const ENV_PATH := TEMP_ROOT + "/environment.glb"
 const COLLISION_PATH := TEMP_ROOT + "/collision.glb"
+const CUE_PATH := TEMP_ROOT + "/cues.json"
 
 var _failures := PackedStringArray()
 
@@ -11,6 +12,14 @@ func _ready() -> void:
 	_check(make_dir_error == OK or make_dir_error == ERR_ALREADY_EXISTS, "test package directory should exist")
 	_check(_write_environment_glb(), "environment GLB should export")
 	_check(_write_collision_glb(), "collision GLB should export")
+	_check(_write_json(CUE_PATH, {
+		"format": "starjunk95/cue-set/1",
+		"duration_ms": 5000,
+		"cues": [
+			{"id": "palette-0", "time_ms": 0, "kind": "palette", "payload": {"background_color": "#123456"}},
+			{"id": "beat-1", "time_ms": 1000, "kind": "beat", "payload": {"strength": 0.8}},
+		],
+	}), "song cue set should be written")
 
 	var manifest := {
 		"format": "starjunk95/track/1",
@@ -18,6 +27,7 @@ func _ready() -> void:
 		"environment": "environment.glb",
 		"collision": "collision.glb",
 		"surface_profile": "wet",
+		"song_cue_set": "cues.json",
 		"checkpoints": [
 			{"id": "start", "position": [0.0, 1.0, 0.0], "size": [4.0, 2.0, 1.0]},
 			{"id": "cp-1", "position": [0.0, 1.0, -20.0], "size": [4.0, 2.0, 1.0]},
@@ -38,6 +48,8 @@ func _ready() -> void:
 		_check(int(result["collision_mesh_count"]) >= 1, "collision mesh count should be reported")
 		_check(int(result["collision_triangle_count"]) > 0, "collision triangle count should be reported")
 		_check(str(result["surface_profile"]) == "wet", "trusted surface selection should be reported")
+		_check(str(result["song_cue_set"].get("format", "")) == "starjunk95/cue-set/1", "validated cue set should be returned")
+		_check(result["song_cue_set"]["cues"].size() == 2, "validated cue events should be retained")
 		_check(_all_collision_bodies_use_surface(collision, "wet"), "game-owned collision bodies should carry trusted surface metadata")
 		_check(result["checkpoints"].size() == 2, "validated checkpoints should be returned")
 		var spawns: Array[Transform3D] = result["spawn_points"]
@@ -45,6 +57,16 @@ func _ready() -> void:
 		_check(is_equal_approx(spawns[0].origin.z, 2.0), "spawn position should be parsed")
 		visual.free()
 		collision.free()
+
+	_check(_write_json(CUE_PATH, {
+		"format": "starjunk95/cue-set/1",
+		"duration_ms": 5000,
+		"cues": [
+			{"id": "unsafe", "time_ms": 100, "kind": "change_vehicle_physics", "payload": {}},
+		],
+	}), "invalid cue fixture should overwrite cue file")
+	var invalid_cues := importer.import_track(TEMP_ROOT, manifest)
+	_check(not bool(invalid_cues.get("ok", true)), "unsupported presentation cue kinds must reject the track import")
 
 	var duplicate_checkpoint := manifest.duplicate(true)
 	duplicate_checkpoint["checkpoints"][1]["id"] = "start"
@@ -114,8 +136,15 @@ func _all_collision_bodies_use_surface(node: Node, expected: String) -> bool:
 			return false
 	return true
 
+func _write_json(path: String, value: Dictionary) -> bool:
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(JSON.stringify(value) + "\n")
+	return true
+
 func _cleanup() -> void:
-	for path in [ENV_PATH, COLLISION_PATH]:
+	for path in [ENV_PATH, COLLISION_PATH, CUE_PATH]:
 		if FileAccess.file_exists(path):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TEMP_ROOT))

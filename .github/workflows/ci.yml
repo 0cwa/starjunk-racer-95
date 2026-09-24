@@ -29,32 +29,10 @@ jobs:
           echo "GODOT_BIN=/tmp/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "$GITHUB_ENV"
       - name: Import project
         run: '"$GODOT_BIN" --headless --path game --editor --quit-after 2'
-      - name: Run vehicle handling foundation tests
-        run: '"$GODOT_BIN" --headless --path game res://tests/unit/vehicle_handling_test.tscn'
-      - name: Run handling assist model tests
-        run: '"$GODOT_BIN" --headless --path game res://tests/unit/handling_assist_model_test.tscn'
-      - name: Run tire force model tests
-        run: '"$GODOT_BIN" --headless --path game res://tests/unit/tire_force_model_test.tscn'
-      - name: Run trusted road surface registry tests
-        run: '"$GODOT_BIN" --headless --path game res://tests/unit/road_surface_registry_test.tscn'
-      - name: Run longitudinal tire force tests
-        run: '"$GODOT_BIN" --headless --path game res://tests/unit/longitudinal_tire_force_test.tscn'
-      - name: Run wheel slip kinematics tests
-        run: '"$GODOT_BIN" --headless --path game res://tests/unit/wheel_slip_kinematics_test.tscn'
-      - name: Run wheel rotation model tests
-        run: '"$GODOT_BIN" --headless --path game res://tests/unit/wheel_rotation_model_test.tscn'
-      - name: Run suspension model tests
-        run: '"$GODOT_BIN" --headless --path game res://tests/unit/suspension_model_test.tscn'
-      - name: Run raycast vehicle integration test
-        run: '"$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/raycast_vehicle_test.tscn'
-      - name: Run road surface vehicle integration test
-        run: 'timeout 45s "$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/road_surface_vehicle_test.tscn'
-      - name: Run playable prototype race integration test
-        run: 'timeout 45s "$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/prototype_race_test.tscn'
+      - name: Run registered Godot unit and integration tests
+        run: python3 tools/godot/run_test_suite.py
       - name: Run playable browser harness scene
         run: 'timeout 30s "$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/web_playable_smoke.tscn'
-      - name: Run vehicle telemetry accumulator tests
-        run: '"$GODOT_BIN" --headless --path game res://tests/unit/vehicle_telemetry_accumulator_test.tscn'
       - name: Characterize prototype vehicle
         run: |
           "$GODOT_BIN" --headless --fixed-fps 60 --path game             res://tests/characterization/vehicle_characterization.tscn --             "--output=$GITHUB_WORKSPACE/vehicle-characterization.json"
@@ -64,35 +42,10 @@ jobs:
           name: vehicle-characterization
           path: vehicle-characterization.json
           if-no-files-found: error
-      - name: Run song cue timeline tests
-        run: '"$GODOT_BIN" --headless --path game res://tests/unit/song_cue_timeline_test.tscn'
-      - name: Run course presentation director tests
-        run: '"$GODOT_BIN" --headless --path game res://tests/unit/course_presentation_director_test.tscn'
-      - name: Run course visual adapter integration test
-        run: '"$GODOT_BIN" --headless --path game res://tests/integration/course_visual_adapter_test.tscn'
-      - name: Run race protocol tests
-        run: '"$GODOT_BIN" --headless --path game res://tests/unit/race_protocol_test.tscn'
-      - name: Run Spritely multiplayer adapter tests
-        run: '"$GODOT_BIN" --headless --path game res://tests/unit/spritely_multiplayer_adapter_test.tscn'
-      - name: Run race content agreement integration test
-        run: 'timeout 45s "$GODOT_BIN" --headless --path game res://tests/integration/race_content_agreement_test.tscn'
-      - name: Run community package safety tests
-        run: '"$GODOT_BIN" --headless --path game res://tests/unit/content_package_test.tscn'
-      - name: Run safe package archive staging tests
-        run: 'timeout 30s "$GODOT_BIN" --headless --path game res://tests/unit/community_package_archive_test.tscn'
-      - name: Run package content identity tests
-        run: 'timeout 30s "$GODOT_BIN" --headless --path game res://tests/unit/community_package_identity_test.tscn'
-      - name: Run content-addressed community library tests
-        run: 'timeout 45s "$GODOT_BIN" --headless --path game res://tests/unit/community_content_library_test.tscn'
-      - name: Run community car runtime importer tests
-        run: '"$GODOT_BIN" --headless --path game res://tests/unit/community_car_importer_test.tscn'
-      - name: Run community track runtime importer tests
-        run: 'timeout 30s "$GODOT_BIN" --headless --path game res://tests/unit/community_track_importer_test.tscn'
-      - name: Run community race bundle integration test
-        run: 'timeout 45s "$GODOT_BIN" --headless --path game res://tests/integration/community_race_bundle_test.tscn'
-      - name: Run community content playable race test
-        run: 'timeout 45s "$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/community_content_playable_race_test.tscn'
-      - name: Run community content service end-to-end test
-        run: 'timeout 60s "$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/community_content_service_test.tscn'
+      - name: Pack playable Web resources
+        run: |
+          mkdir -p build/ci-web-export
+          "$GODOT_BIN" --headless --path game             --export-pack "Web Playable"             "$GITHUB_WORKSPACE/build/ci-web-export/starjunk.pck"
+          test -s build/ci-web-export/starjunk.pck
       - name: Load renderer torture scene
         run: '"$GODOT_BIN" --headless --path game res://tests/perf/renderer_torture/renderer_torture.tscn --quit-after 20'

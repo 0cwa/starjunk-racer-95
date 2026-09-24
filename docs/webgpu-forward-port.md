@@ -36,6 +36,22 @@ The first revived gate removed the Dawn-only experimental feature requirement su
 
 The browser compatibility patch now queries the adapter limits and clamps only the fork's elevated sampled-texture/storage-buffer/storage-texture requests (48/12/8) to the adapter's advertised values under Emdawn. Desktop Dawn retains the original requirements. The smoke artifact also records browser adapter features and the relevant limits so later renderer failures are tied to the actual capability envelope rather than guessed constants.
 
+## Pinned transform correction
+
+The pinned `spirv-webgpu-transform` revision has a one-line opcode-table defect:
+it defines `SPV_INSTRUCTION_OP_NOP` as opcode `1`, but SPIR-V assigns opcode
+`0` to `OpNop` and opcode `1` to `OpUndef`. Because every transform calls
+the shared `prune_noops()` helper, transformed Godot 4.7.2 shaders were deleting
+legitimate `OpUndef` definitions while leaving their `OpReturnValue` and
+`OpFunctionCall` uses intact. The browser artifact exposed those dangling IDs
+directly in the reconstructed `.spv` files.
+
+We keep the upstream transform commit pinned and apply
+`engine/patches/spirv-webgpu-transform-fix-opnop.patch` before compiling the
+Rust dependency. This keeps the third-party source identity reproducible while
+making the local compatibility correction explicit, reviewable, and removable
+if the upstream pin changes.
+
 ## Repeatable probes
 
 - `tools/engine/forward_port_probe.sh` — source merge/conflict inventory.
