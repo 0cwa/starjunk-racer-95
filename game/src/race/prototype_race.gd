@@ -8,7 +8,6 @@ const TRACK_RADIUS_Z := 28.0
 const SPAWN_ANGLE := -0.28
 
 @export var input_enabled: bool = true
-@export var hud_enabled: bool = true
 @export_range(0.0, 1.0, 0.01) var starting_realism: float = 0.35
 
 var vehicle: RaycastVehicleController
@@ -42,8 +41,7 @@ func _ready() -> void:
 	_build_presentation()
 	_build_vehicle()
 	_build_camera()
-	if hud_enabled:
-		_build_hud()
+	_build_hud()
 	set_realism(starting_realism)
 
 func _physics_process(_delta: float) -> void:
@@ -69,8 +67,7 @@ func _physics_process(_delta: float) -> void:
 func _process(delta: float) -> void:
 	_update_camera(delta)
 	_update_wheel_visuals(delta)
-	if hud_enabled:
-		_update_hud()
+	_update_hud()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if input_enabled and event.is_action_pressed("race_reset"):
