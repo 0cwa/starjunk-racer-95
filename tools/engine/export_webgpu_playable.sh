@@ -23,7 +23,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-python3 - "$PROJECT_FILE" "$PRESET_FILE" "$TEMPLATE_ZIP" "$MAIN_SCENE" <<'PY'
+python3 - "$PROJECT_FILE" "$PRESET_FILE" "$TEMPLATE_ZIP" "$MAIN_SCENE" "${STARJUNK_WEB_RENDERER:-mobile}" <<'PY'
 import re
 import sys
 from pathlib import Path
@@ -32,6 +32,22 @@ project_path = Path(sys.argv[1])
 preset_path = Path(sys.argv[2])
 template = str(Path(sys.argv[3]).resolve()).replace("\\", "/")
 main_scene = sys.argv[4]
+web_renderer = sys.argv[5]
+if web_renderer not in ("mobile", "gl_compatibility"):
+    raise SystemExit(f"unsupported Web renderer: {web_renderer}")
+
+if web_renderer == "gl_compatibility":
+    project = project_path.read_text(encoding="utf-8")
+    project, substitutions = re.subn(
+        r'^renderer/rendering_method.web="mobile"$',
+        'renderer/rendering_method.web="gl_compatibility"',
+        project,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    if substitutions != 1:
+        raise SystemExit("expected exactly one Mobile Web renderer setting")
+    project_path.write_text(project, encoding="utf-8")
 
 if main_scene:
     project = project_path.read_text(encoding="utf-8")
