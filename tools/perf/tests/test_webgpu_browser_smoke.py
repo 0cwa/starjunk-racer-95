@@ -11,6 +11,7 @@ from tools.perf.webgpu_browser_smoke import (
     console_json_from_event,
     extract_browser_events,
     find_console_json,
+    renderer_identity_errors,
     write_spirv_dumps,
 )
 
@@ -89,6 +90,30 @@ class WebGPUBrowserSmokeParsingTests(unittest.TestCase):
             self.assertEqual(summaries[0]["kind"], "raw")
             dumped = Path(temp_dir, summaries[0]["file"]).read_bytes()
             self.assertEqual(dumped, raw)
+
+    def test_accepts_mobile_webgpu_renderer_identity(self):
+        self.assertEqual(
+            renderer_identity_errors(
+                {
+                    "renderer": "mobile",
+                    "rendering_driver": "webgpu",
+                    "rendering_api": "WebGpu",
+                }
+            ),
+            [],
+        )
+
+    def test_rejects_non_webgpu_rendering_device_identity(self):
+        self.assertEqual(
+            renderer_identity_errors(
+                {
+                    "renderer": "mobile",
+                    "rendering_driver": "webgpu",
+                    "rendering_api": "vulkan",
+                }
+            ),
+            ["Expected RenderingDevice API 'webgpu', got 'vulkan'"],
+        )
 
     def test_extracts_structured_webgpu_events(self):
         validation = {
