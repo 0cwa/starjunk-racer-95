@@ -17,6 +17,7 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 	_race.input_enabled = false
+	_race.hud_enabled = false
 	add_child(_race)
 
 func _process(_delta: float) -> void:
