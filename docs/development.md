@@ -34,8 +34,8 @@ A reproducible local package flow is:
 
 ```sh
 networking/spritely/run_spike.sh
-GODOT_BIN=/path/to/project-webgpu-godot \
-  "$GODOT_BIN" --headless --path game --export-release "Web Playable"
+GODOT_BIN=/path/to/project-webgpu-godot
+"$GODOT_BIN" --headless --path game --export-release "Web Playable"
 tools/networking/package_spritely_web.sh build/web-playable
 ```
 
@@ -45,8 +45,12 @@ The packager refuses an export whose HTML is missing the expected bootstrap
 markers, copies the runtime into `spritely/`, and writes `SHA256SUMS`.
 
 The `Web Playable` target is intended for the project WebGPU export template.
-The networking package itself is renderer-independent so it can be validated
-separately from the engine forward-port.
+Until that renderer runs the full race reliably, `.github/workflows/browser-demo.yml`
+produces a separately labeled browser demo using Godot 4.7.2's pinned
+Compatibility/WebGL template. It runs the real race and Spritely Chromium gate
+before uploading a complete static site; it is a delivery fallback, not a
+replacement for the Mobile/WebGPU correctness milestone or a GPU benchmark.
+The networking package itself is renderer-independent.
 
 
 ## Development-state handoff

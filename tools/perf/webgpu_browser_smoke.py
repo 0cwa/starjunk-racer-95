@@ -337,6 +337,8 @@ def main() -> int:
     parser.add_argument("--result-global", default="__STARJUNK_PERF_RESULT__")
     parser.add_argument("--purpose", default="browser_webgpu_smoke")
     parser.add_argument("--expected-profile", default="")
+    parser.add_argument("--expected-renderer", default="mobile")
+    parser.add_argument("--expected-driver", default="webgpu")
     parser.add_argument("--spirv-dump-dir", default="")
     parser.add_argument(
         "--required-console-prefix",
@@ -386,6 +388,7 @@ def main() -> int:
         "--disable-gpu-sandbox",
         "--ignore-gpu-blocklist",
         "--enable-unsafe-webgpu",
+        "--enable-unsafe-swiftshader",
         "--enable-features=Vulkan,WebGPUDeveloperFeatures",
         "--use-angle=swiftshader",
         "--use-vulkan=swiftshader",
@@ -588,7 +591,7 @@ window.addEventListener('unhandledrejection', (event) => {
             await_promise=True,
             timeout=20.0,
         )
-        if not adapter_probe or not adapter_probe.get("adapter"):
+        if args.expected_driver == "webgpu" and (not adapter_probe or not adapter_probe.get("adapter")):
             raise RuntimeError(f"WebGPU adapter unavailable: {adapter_probe}")
 
         result_console_prefix = RESULT_CONSOLE_PREFIXES.get(args.result_global, "")
@@ -680,11 +683,13 @@ window.addEventListener('unhandledrejection', (event) => {
             validation_errors.append(
                 f"Required browser console signal {prefix!r} was not observed"
             )
-        if renderer != "mobile":
-            validation_errors.append(f"Expected Mobile renderer, got {renderer!r}")
-        if driver != "webgpu":
+        if renderer != args.expected_renderer:
             validation_errors.append(
-                f"Expected Web rendering driver label 'webgpu', got {driver!r}"
+                f"Expected renderer {args.expected_renderer!r}, got {renderer!r}"
+            )
+        if driver != args.expected_driver:
+            validation_errors.append(
+                f"Expected rendering driver {args.expected_driver!r}, got {driver!r}"
             )
 
         renderer_errors = list(event_summary.get("renderer_errors", []))

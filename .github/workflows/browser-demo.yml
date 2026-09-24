@@ -1,0 +1,102 @@
+name: Browser Playable Demo (Compatibility)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "game/**"
+      - "networking/spritely/**"
+      - "tools/engine/export_webgpu_playable.sh"
+      - "tools/networking/package_spritely_web.sh"
+      - "tools/perf/webgpu_browser_smoke.py"
+      - ".github/workflows/browser-demo.yml"
+  pull_request:
+    paths:
+      - "game/**"
+      - "networking/spritely/**"
+      - "tools/engine/export_webgpu_playable.sh"
+      - "tools/networking/package_spritely_web.sh"
+      - "tools/perf/webgpu_browser_smoke.py"
+      - ".github/workflows/browser-demo.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: browser-demo-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  playable:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install browser smoke dependency
+        run: python3 -m pip install websocket-client
+      - name: Download pinned Godot 4.7.2 editor and Web export template
+        run: |
+          curl -fL --retry 3 -o /tmp/godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          echo 'cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4  /tmp/godot.zip' | sha256sum -c -
+          curl -fL --retry 3 -o /tmp/godot-templates.tpz \
+            https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz
+          echo 'f298490b8d44d934be425a5a65a51bf15f422428b229a06a6e11d9ffea248011  /tmp/godot-templates.tpz' | sha256sum -c -
+          unzip -q /tmp/godot.zip -d /tmp/godot-editor
+          chmod +x /tmp/godot-editor/Godot_v4.7.2-stable_linux.x86_64
+          unzip -p /tmp/godot-templates.tpz templates/web_nothreads_release.zip > /tmp/godot-web-release.zip
+          echo 'd3ee2f08cef0cf3cf6678a6355a92a8db48ccdd35cbd2e8bfd5f0e8a0b4032a0  /tmp/godot-web-release.zip' | sha256sum -c -
+      - name: Build and validate pinned Spritely Web runtime
+        run: networking/spritely/run_spike.sh
+      - name: Export real PrototypeRace browser smoke
+        env:
+          STARJUNK_WEB_RENDERER: gl_compatibility
+        run: |
+          tools/engine/export_webgpu_playable.sh \
+            /tmp/godot-editor/Godot_v4.7.2-stable_linux.x86_64 \
+            /tmp/godot-web-release.zip \
+            "$GITHUB_WORKSPACE/build/browser-playable-smoke" \
+            res://tests/integration/web_playable_smoke.tscn
+          tools/networking/package_spritely_web.sh "$GITHUB_WORKSPACE/build/browser-playable-smoke"
+          (cd build/browser-playable-smoke/spritely && sha256sum -c SHA256SUMS)
+      - name: Prove real race and Spritely bootstrap in Chromium
+        run: |
+          python3 tools/perf/webgpu_browser_smoke.py \
+            --root build/browser-playable-smoke \
+            --output build/browser-playable-smoke.json \
+            --result-global __STARJUNK_PLAYABLE_RESULT__ \
+            --purpose browser_compatibility_playable \
+            --expected-profile playable \
+            --expected-renderer gl_compatibility \
+            --expected-driver opengl3 \
+            --required-console-prefix STARJUNK_SPRITELY_READY_JSON: \
+            --timeout 90
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path('build/browser-playable-smoke.json').read_text())['payload']
+          if payload.get('vehicle_ready') is not True or int(payload.get('checkpoint_count', 0)) < 2:
+              raise SystemExit(f'PrototypeRace did not construct vehicle and course: {payload}')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-compatibility-smoke
+          path: build/browser-playable-smoke.json
+          if-no-files-found: warn
+      - name: Export and package the project-default race
+        env:
+          STARJUNK_WEB_RENDERER: gl_compatibility
+        run: |
+          tools/engine/export_webgpu_playable.sh \
+            /tmp/godot-editor/Godot_v4.7.2-stable_linux.x86_64 \
+            /tmp/godot-web-release.zip \
+            "$GITHUB_WORKSPACE/build/browser-demo"
+          tools/networking/package_spritely_web.sh "$GITHUB_WORKSPACE/build/browser-demo"
+          (cd build/browser-demo/spritely && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: starjunk-racer-95-browser-demo-compatibility
+          path: build/browser-demo/
+          if-no-files-found: error
