@@ -10,7 +10,7 @@ on:
       - "game/export_presets.cfg"
       - "game/tests/perf/webgpu_boot/**"
       - "game/tests/integration/web_playable_smoke.gd"
-      - "game/tests/integration/web_playable_smoke.tscn"
+      - "game/tests/integration/web_playable_smoke_test.tscn"
       - "networking/spritely/**"
       - "tools/networking/package_spritely_web.sh"
       - ".github/workflows/webgpu-candidate-build.yml"
@@ -22,7 +22,7 @@ on:
       - "game/export_presets.cfg"
       - "game/tests/perf/webgpu_boot/**"
       - "game/tests/integration/web_playable_smoke.gd"
-      - "game/tests/integration/web_playable_smoke.tscn"
+      - "game/tests/integration/web_playable_smoke_test.tscn"
       - "networking/spritely/**"
       - "tools/networking/package_spritely_web.sh"
       - ".github/workflows/webgpu-candidate-build.yml"
@@ -168,7 +168,7 @@ jobs:
             "$GODOT_BIN" \
             "$GITHUB_WORKSPACE/build/webgpu-port-candidate/godot/bin/godot.web.template_release.wasm32.nothreads.zip" \
             "$GITHUB_WORKSPACE/build/webgpu-playable-smoke" \
-            "res://tests/integration/web_playable_smoke.tscn"
+            "res://tests/integration/web_playable_smoke_test.tscn"
           tools/networking/package_spritely_web.sh "$GITHUB_WORKSPACE/build/webgpu-playable-smoke"
           (
             cd "$GITHUB_WORKSPACE/build/webgpu-playable-smoke/spritely"
