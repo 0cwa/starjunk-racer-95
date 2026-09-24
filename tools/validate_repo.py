@@ -24,7 +24,7 @@ REQUIRED = [
     "game/tests/perf/webgpu_boot/webgpu_boot.gd",
     "game/tests/perf/webgpu_boot/webgpu_boot.tscn",
     "game/tests/integration/web_playable_smoke.gd",
-    "game/tests/integration/web_playable_smoke.tscn",
+    "game/tests/integration/web_playable_smoke_test.tscn",
     ".github/workflows/webgpu-candidate-build.yml",
     ".github/workflows/webgpu-forward-port-probe.yml",
     "networking/source-lock.json",
