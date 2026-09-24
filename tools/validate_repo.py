@@ -138,6 +138,9 @@ def main() -> None:
     if "STARJUNK_WEB_TEXT_DRIVER: \"Fallback (Built-in)\"" not in candidate_workflow:
         raise SystemExit("WebGPU playable candidate must select the fallback text driver")
 
+    if "module_text_server_fb_enabled=yes" not in candidate_workflow:
+        raise SystemExit("WebGPU template must compile the fallback text server module")
+
     compatibility_workflow = (
         ROOT / ".github/workflows/browser-demo.yml"
     ).read_text(encoding="utf-8")
