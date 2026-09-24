@@ -163,6 +163,8 @@ jobs:
       - name: Build and validate pinned Spritely Web runtime
         run: networking/spritely/run_spike.sh
       - name: Export real PrototypeRace browser smoke
+        env:
+          STARJUNK_WEB_TEXT_DRIVER: Fallback
         run: |
           tools/engine/export_webgpu_playable.sh \
             "$GODOT_BIN" \
@@ -203,6 +205,8 @@ jobs:
           path: build/webgpu-playable-smoke.json
           if-no-files-found: warn
       - name: Export shareable PrototypeRace browser demo
+        env:
+          STARJUNK_WEB_TEXT_DRIVER: Fallback
         run: |
           tools/engine/export_webgpu_playable.sh \
             "$GODOT_BIN" \
