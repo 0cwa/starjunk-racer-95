@@ -27,6 +27,27 @@ def replace_exact_count(path: Path, old: str, new: str, expected: int) -> None:
     path.write_text(source.replace(old, new), encoding="utf-8")
 
 
+def apply_particles_alias_patch(source: Path) -> None:
+    header = source / "servers/rendering/renderer_rd/storage_rd/particles_storage.h"
+    implementation = source / "servers/rendering/renderer_rd/storage_rd/particles_storage.cpp"
+
+    replace_once(
+        header,
+        """\t\tRID unused_emission_storage_buffer;\n\t\tRID unused_trail_storage_buffer;\n""",
+        """\t\tRID unused_emission_storage_buffer;\n\t\tRID unused_sub_emission_storage_buffer;\n\t\tRID unused_trail_storage_buffer;\n""",
+    )
+    replace_once(
+        implementation,
+        """\tif (particles->unused_emission_storage_buffer.is_valid()) {\n\t\tRD::get_singleton()->free_rid(particles->unused_emission_storage_buffer);\n\t\tparticles->unused_emission_storage_buffer = RID();\n\t}\n\n\tif (particles->unused_trail_storage_buffer.is_valid()) {\n""",
+        """\tif (particles->unused_emission_storage_buffer.is_valid()) {\n\t\tRD::get_singleton()->free_rid(particles->unused_emission_storage_buffer);\n\t\tparticles->unused_emission_storage_buffer = RID();\n\t}\n\n\tif (particles->unused_sub_emission_storage_buffer.is_valid()) {\n\t\tRD::get_singleton()->free_rid(particles->unused_sub_emission_storage_buffer);\n\t\tparticles->unused_sub_emission_storage_buffer = RID();\n\t}\n\n\tif (particles->unused_trail_storage_buffer.is_valid()) {\n""",
+    )
+    replace_once(
+        implementation,
+        """\t\t\t} else {\n\t\t\t\t_particles_ensure_unused_emission_buffer(p_particles);\n\t\t\t\tu.append_id(p_particles->unused_emission_storage_buffer);\n\t\t\t}\n\t\t\tuniforms.push_back(u);\n\t\t}\n\n\t\tp_particles->particles_material_uniform_set = RD::get_singleton()->uniform_set_create(uniforms, particles_shader.default_shader_rd, 1);\n""",
+        """\t\t\t} else {\n\t\t\t\t// SourceEmission and DestEmission are both writable storage bindings.\n\t\t\t\t// Keep their fallback buffers distinct: WebGPU rejects overlapping writable\n\t\t\t\t// bindings even when the shader's can_emit guard prevents writes.\n\t\t\t\tif (p_particles->unused_sub_emission_storage_buffer.is_null()) {\n\t\t\t\t\tp_particles->unused_sub_emission_storage_buffer = RD::get_singleton()->storage_buffer_create(sizeof(ParticleEmissionBuffer));\n\t\t\t\t}\n\t\t\t\tu.append_id(p_particles->unused_sub_emission_storage_buffer);\n\t\t\t}\n\t\t\tuniforms.push_back(u);\n\t\t}\n\n\t\tp_particles->particles_material_uniform_set = RD::get_singleton()->uniform_set_create(uniforms, particles_shader.default_shader_rd, 1);\n""",
+    )
+
+
 def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit("usage: apply_starjunk_port_patches.py GODOT_SOURCE")
@@ -1463,6 +1484,8 @@ ConvertResult webgpu_translate_spirv_to_wgsl(const uint32_t *spv, uint32_t spv_c
 \t\t}
 """,
     )
+
+    apply_particles_alias_patch(source)
 
     print("Applied Starjunk WebGPU 4.7 compatibility patches")
 
