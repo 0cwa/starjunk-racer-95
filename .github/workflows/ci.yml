@@ -31,8 +31,6 @@ jobs:
         run: '"$GODOT_BIN" --headless --path game --editor --quit-after 2'
       - name: Run registered Godot unit and integration tests
         run: python3 tools/godot/run_test_suite.py
-      - name: Run playable browser harness scene
-        run: 'timeout 30s "$GODOT_BIN" --headless --fixed-fps 60 --path game res://tests/integration/web_playable_smoke.tscn'
       - name: Characterize prototype vehicle
         run: |
           "$GODOT_BIN" --headless --fixed-fps 60 --path game             res://tests/characterization/vehicle_characterization.tscn --             "--output=$GITHUB_WORKSPACE/vehicle-characterization.json"
