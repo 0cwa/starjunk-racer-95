@@ -25,13 +25,21 @@ func _process(_delta: float) -> void:
 		return
 
 	var vehicle_ready := _race != null and _race.vehicle != null
+	var checkpoint_count := _race.checkpoint_count() if _race != null else 0
+	var race_ready := vehicle_ready and checkpoint_count >= 2
+	var rendering_device: RenderingDevice = RenderingServer.get_rendering_device()
+	var rendering_api := ""
+	if rendering_device != null:
+		rendering_api = rendering_device.get_device_api_name()
 	var result := {
 		"profile": "playable",
 		"renderer": RenderingServer.get_current_rendering_method(),
 		"rendering_driver": RenderingServer.get_current_rendering_driver_name(),
+		"rendering_api": rendering_api,
 		"frames": _frames,
+		"race_ready": race_ready,
 		"vehicle_ready": vehicle_ready,
-		"checkpoint_count": _race.checkpoint_count() if _race != null else 0,
+		"checkpoint_count": checkpoint_count,
 		"lap": _race.current_lap() if _race != null else -1,
 		"engine_version": Engine.get_version_info().get("string", "unknown"),
 	}
@@ -43,4 +51,4 @@ func _process(_delta: float) -> void:
 			"window.__STARJUNK_PLAYABLE_RESULT__ = %s;" % payload
 		)
 	else:
-		get_tree().quit(0 if vehicle_ready else 1)
+		get_tree().quit(0 if race_ready else 1)
