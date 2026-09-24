@@ -125,6 +125,19 @@ RESULT_CONSOLE_PREFIXES = {
 }
 
 
+def renderer_identity_errors(
+    payload: dict, expected_renderer: str, expected_driver: str
+) -> list[str]:
+    renderer = str(payload.get("renderer", "")).lower()
+    driver = str(payload.get("rendering_driver", "")).lower()
+    errors: list[str] = []
+    if renderer != expected_renderer:
+        errors.append(f"Expected renderer {expected_renderer!r}, got {renderer!r}")
+    if driver != expected_driver:
+        errors.append(f"Expected rendering driver {expected_driver!r}, got {driver!r}")
+    return errors
+
+
 def console_values(event: dict) -> list[object]:
     if event.get("method") != "Runtime.consoleAPICalled":
         return []
@@ -337,6 +350,8 @@ def main() -> int:
     parser.add_argument("--result-global", default="__STARJUNK_PERF_RESULT__")
     parser.add_argument("--purpose", default="browser_webgpu_smoke")
     parser.add_argument("--expected-profile", default="")
+    parser.add_argument("--expected-renderer", default="mobile")
+    parser.add_argument("--expected-driver", default="webgpu")
     parser.add_argument("--spirv-dump-dir", default="")
     parser.add_argument(
         "--required-console-prefix",
@@ -386,6 +401,7 @@ def main() -> int:
         "--disable-gpu-sandbox",
         "--ignore-gpu-blocklist",
         "--enable-unsafe-webgpu",
+        "--enable-unsafe-swiftshader",
         "--enable-features=Vulkan,WebGPUDeveloperFeatures",
         "--use-angle=swiftshader",
         "--use-vulkan=swiftshader",
@@ -588,7 +604,9 @@ window.addEventListener('unhandledrejection', (event) => {
             await_promise=True,
             timeout=20.0,
         )
-        if not adapter_probe or not adapter_probe.get("adapter"):
+        if args.expected_driver == "webgpu" and (
+            not adapter_probe or not adapter_probe.get("adapter")
+        ):
             raise RuntimeError(f"WebGPU adapter unavailable: {adapter_probe}")
 
         result_console_prefix = RESULT_CONSOLE_PREFIXES.get(args.result_global, "")
@@ -673,15 +691,9 @@ window.addEventListener('unhandledrejection', (event) => {
             "spirv_dumps": spirv_dumps,
         }
 
-        validation_errors: list[str] = []
-        renderer = str(payload.get("renderer", "")).lower()
-        driver = str(payload.get("rendering_driver", "")).lower()
-        if renderer != "mobile":
-            validation_errors.append(f"Expected Mobile renderer, got {renderer!r}")
-        if driver != "webgpu":
-            validation_errors.append(
-                f"Expected Web rendering driver label 'webgpu', got {driver!r}"
-            )
+        validation_errors = renderer_identity_errors(
+            payload, args.expected_renderer, args.expected_driver
+        )
         for prefix in missing_console_prefixes:
             validation_errors.append(
                 f"Required browser console signal {prefix!r} was not observed"
