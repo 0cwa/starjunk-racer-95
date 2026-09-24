@@ -107,6 +107,8 @@ jobs:
           unzip -q /tmp/godot.zip -d /tmp/godot-editor
           chmod +x /tmp/godot-editor/Godot_v${GODOT_VERSION}-stable_linux.x86_64
           echo "GODOT_BIN=/tmp/godot-editor/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Import game before Web export
+        run: '"$GODOT_BIN" --headless --path game --editor --quit-after 2'
       - name: Export lightweight Godot WebGPU boot scene
         run: |
           tools/engine/export_webgpu_benchmark.sh \
