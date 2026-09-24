@@ -10,6 +10,19 @@ REQUIRED = [
     "AGENTS.md",
     "docs/README.md",
     "engine/source-lock.json",
+    "engine/patches/spirv-webgpu-transform-fix-opnop.patch",
+    "engine/patches/spirv-webgpu-transform-fix-binding-array-call.patch",
+    "tools/engine/apply_starjunk_port_patches.py",
+    "tools/engine/prepare_port_candidate.sh",
+    "tools/engine/build_webgpu_rust_deps.sh",
+    "tools/engine/forward_port_probe.sh",
+    "tools/engine/export_webgpu_benchmark.sh",
+    "tools/engine/analyze_spirv_dumps.sh",
+    "tools/perf/webgpu_browser_smoke.py",
+    "game/tests/perf/webgpu_boot/webgpu_boot.gd",
+    "game/tests/perf/webgpu_boot/webgpu_boot.tscn",
+    ".github/workflows/webgpu-candidate-build.yml",
+    ".github/workflows/webgpu-forward-port-probe.yml",
     "networking/source-lock.json",
     "networking/spritely/web/bootstrap.mjs",
     "tools/godot/run_test_suite.py",
@@ -58,6 +71,58 @@ def main() -> None:
         commit = lock[key]["commit"]
         if len(commit) != 40 or any(c not in "0123456789abcdef" for c in commit):
             raise SystemExit(f"{key} is not pinned to a full SHA")
+
+    for key in ("naga_native", "spirv_webgpu_transform"):
+        commit = lock["webgpu_rust_dependencies"][key]["commit"]
+        if len(commit) != 40 or any(c not in "0123456789abcdef" for c in commit):
+            raise SystemExit(f"webgpu_rust_dependencies.{key} is not pinned to a full SHA")
+
+    transform_dependency = lock["webgpu_rust_dependencies"]["spirv_webgpu_transform"]
+    expected_transform_patches = [
+        "engine/patches/spirv-webgpu-transform-fix-opnop.patch",
+        "engine/patches/spirv-webgpu-transform-fix-binding-array-call.patch",
+    ]
+    if transform_dependency.get("patches") != expected_transform_patches:
+        raise SystemExit(
+            "spirv_webgpu_transform must declare the reviewed local patch series"
+        )
+
+    if lock.get("emscripten") != "6.0.9":
+        raise SystemExit("WebGPU candidate Emscripten must remain pinned to 6.0.9")
+
+    transform_patch = (
+        ROOT / "engine/patches/spirv-webgpu-transform-fix-opnop.patch"
+    ).read_text(encoding="utf-8")
+    if (
+        "-pub const SPV_INSTRUCTION_OP_NOP: u16 = 1;" not in transform_patch
+        or "+pub const SPV_INSTRUCTION_OP_NOP: u16 = 0;" not in transform_patch
+    ):
+        raise SystemExit("SPIR-V transform patch must correct OpNop from opcode 1 to 0")
+
+    binding_array_patch = (
+        ROOT / "engine/patches/spirv-webgpu-transform-fix-binding-array-call.patch"
+    ).read_text(encoding="utf-8")
+    for marker in (
+        "An opaque binding-array element may be passed directly to a helper",
+        "function_call_args.contains(&old_result_id)",
+        "Some((result_type_id, result_id))",
+    ):
+        if marker not in binding_array_patch:
+            raise SystemExit(
+                "SPIR-V binding-array patch is missing direct function-call handling"
+            )
+
+    rust_build = (ROOT / "tools/engine/build_webgpu_rust_deps.sh").read_text(
+        encoding="utf-8"
+    )
+    if 'SPIRV_PATCH_RELS=("${VALUES[@]:4}")' not in rust_build:
+        raise SystemExit("WebGPU Rust dependency build must read the locked patch series")
+
+    candidate_workflow = (
+        ROOT / ".github/workflows/webgpu-candidate-build.yml"
+    ).read_text(encoding="utf-8")
+    if "'engine/patches/*.patch'" not in candidate_workflow:
+        raise SystemExit("WebGPU candidate cache key must include local patch contents")
 
     network_lock = json.loads(
         (ROOT / "networking/source-lock.json").read_text(encoding="utf-8")

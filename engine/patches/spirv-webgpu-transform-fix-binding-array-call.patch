@@ -1,0 +1,65 @@
+diff --git a/src/splitbindingarray.rs b/src/splitbindingarray.rs
+index 3c42027..d7fe5de 100644
+--- a/src/splitbindingarray.rs
++++ b/src/splitbindingarray.rs
+@@ -400,4 +400,60 @@ pub fn splitbindingarray(in_spv: &[u32], corrections: &mut CorrectionMap) -> Res
+                 continue;
+             }
+ 
++            // An opaque binding-array element may be passed directly to a helper
++            // function without an intervening OpLoad. The access chain is removed
++            // above, so rebuild each such call as a switch over the split variables
++            // and preserve the original call result with an OpPhi.
++            for &function_call_idx in op_function_call_idxs.iter() {
++                const ARGUMENT_OFFSET: usize = 4;
++                let function_call_word_count = hiword(spv[function_call_idx]) as usize;
++                let function_call_args = &spv[function_call_idx + ARGUMENT_OFFSET
++                    ..function_call_idx + function_call_word_count];
++                if !function_call_args.contains(&old_result_id) {
++                    continue;
++                }
++
++                // A call that directly consumes more than one binding-array element
++                // needs a nested selection. Leave that uncommon case untouched so it
++                // remains visible to validation instead of generating incorrect SPIR-V.
++                let has_other_binding_array_access_arg = access_idxs.iter().any(|entry| {
++                    let other_ac_idx = entry.0;
++                    entry.3.is_some()
++                        && other_ac_idx != ac_idx
++                        && function_call_args.contains(&spv[other_ac_idx + 2])
++                });
++                if has_other_binding_array_access_arg {
++                    continue;
++                }
++
++                new_spv[function_call_idx..function_call_idx + function_call_word_count]
++                    .fill(encode_word(1, SPV_INSTRUCTION_OP_NOP));
++                let result_type_id = spv[function_call_idx + 1];
++                let result_id = spv[function_call_idx + 2];
++                let builder = |ib: &mut u32, target_id: u32| {
++                    let mut call =
++                        spv[function_call_idx..function_call_idx + function_call_word_count].to_vec();
++                    let new_result_id = inc(ib);
++                    call[2] = new_result_id;
++                    for argument_id in call[ARGUMENT_OFFSET..].iter_mut() {
++                        if *argument_id == old_result_id {
++                            *argument_id = target_id;
++                        }
++                    }
++                    (call, Some(new_result_id))
++                };
++                let switch = select_template_spv(
++                    &mut instruction_bound,
++                    base_id,
++                    index_0_id,
++                    length as usize,
++                    builder,
++                    Some((result_type_id, result_id)),
++                );
++                instruction_inserts.push(InstructionInsert {
++                    previous_spv_idx: function_call_idx,
++                    instruction: switch,
++                });
++            }
++
+             let load_idxs = op_load_idxs
