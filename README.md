@@ -14,14 +14,20 @@ A neo-retro racing game with saturated, sparkly 2.5D/3D visuals, balanced but ch
 
 ## Start here
 
-Read `AGENTS.md`, then `docs/README.md`.
+Read `AGENTS.md`, then `docs/README.md`, then the canonical [Development State — Start Here issue](https://github.com/0cwa/starjunk-racer-95/issues/48). The issue is the current operational snapshot; repository code, tests, CI, docs, and ADRs remain authoritative.
 
 Common commands:
 
 ~~~sh
 make check
+GODOT_BIN=/path/to/godot make godot-test
 make perf-test
 GODOT_BIN=/path/to/godot tools/perf/run_godot_benchmark.sh
 ~~~
+
+`make check` validates that every `game/tests/unit/**/*_test.tscn` and
+`game/tests/integration/**/*_test.tscn` scene is registered in the deterministic
+Godot suite manifest. Use `tools/godot/run_test_suite.py --filter <substring>`
+to run a focused subset while iterating.
 
 No performance baseline should be committed until it was captured on a named, repeatable runner. Never “fix” a regression by replacing the baseline without an explanation.

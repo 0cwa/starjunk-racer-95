@@ -1,7 +1,8 @@
-.PHONY: check perf-test
+.PHONY: check godot-test perf-test
 
 check:
 	python3 tools/validate_repo.py
+	python3 tools/godot/run_test_suite.py --validate-only
 	python3 -m unittest discover -s tools/perf/tests -p 'test_*.py'
 	bash -n tools/perf/run_godot_benchmark.sh
 	bash -n tools/engine/fetch_sources.sh
@@ -15,6 +16,9 @@ check:
 	bash -n tools/engine/analyze_spirv_dumps.sh
 	bash -n tools/networking/package_spritely_web.sh
 	python3 -m py_compile tools/engine/apply_starjunk_port_patches.py tools/perf/webgpu_browser_smoke.py
+
+godot-test:
+	python3 tools/godot/run_test_suite.py
 
 perf-test:
 	python3 -m unittest discover -s tools/perf/tests -p 'test_*.py'

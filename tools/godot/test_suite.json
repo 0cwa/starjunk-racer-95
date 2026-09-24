@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "tests": [
+    {"scene": "res://tests/unit/vehicle_handling_test.tscn"},
+    {"scene": "res://tests/unit/handling_assist_model_test.tscn"},
+    {"scene": "res://tests/unit/tire_force_model_test.tscn"},
+    {"scene": "res://tests/unit/road_surface_registry_test.tscn"},
+    {"scene": "res://tests/unit/longitudinal_tire_force_test.tscn"},
+    {"scene": "res://tests/unit/wheel_slip_kinematics_test.tscn"},
+    {"scene": "res://tests/unit/wheel_rotation_model_test.tscn"},
+    {"scene": "res://tests/unit/suspension_model_test.tscn"},
+    {"scene": "res://tests/unit/vehicle_telemetry_accumulator_test.tscn"},
+    {"scene": "res://tests/unit/song_cue_timeline_test.tscn"},
+    {"scene": "res://tests/unit/course_presentation_director_test.tscn"},
+    {"scene": "res://tests/unit/race_protocol_test.tscn"},
+    {"scene": "res://tests/unit/spritely_multiplayer_adapter_test.tscn"},
+    {"scene": "res://tests/unit/content_package_test.tscn"},
+    {"scene": "res://tests/unit/community_package_archive_test.tscn", "timeout_seconds": 30},
+    {"scene": "res://tests/unit/community_package_identity_test.tscn", "timeout_seconds": 30},
+    {"scene": "res://tests/unit/community_content_library_test.tscn", "timeout_seconds": 45},
+    {"scene": "res://tests/unit/community_car_importer_test.tscn"},
+    {"scene": "res://tests/unit/community_track_importer_test.tscn", "timeout_seconds": 30},
+    {"scene": "res://tests/integration/raycast_vehicle_test.tscn", "fixed_fps": 60},
+    {"scene": "res://tests/integration/road_surface_vehicle_test.tscn", "fixed_fps": 60, "timeout_seconds": 45},
+    {"scene": "res://tests/integration/prototype_race_test.tscn", "fixed_fps": 60, "timeout_seconds": 45},
+    {"scene": "res://tests/integration/course_visual_adapter_test.tscn"},
+    {"scene": "res://tests/integration/race_content_agreement_test.tscn", "timeout_seconds": 45},
+    {"scene": "res://tests/integration/community_race_bundle_test.tscn", "timeout_seconds": 45},
+    {"scene": "res://tests/integration/community_content_playable_race_test.tscn", "fixed_fps": 60, "timeout_seconds": 45},
+    {"scene": "res://tests/integration/community_content_service_test.tscn", "fixed_fps": 60, "timeout_seconds": 60}
+  ]
+}

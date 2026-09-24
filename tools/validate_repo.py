@@ -25,6 +25,8 @@ REQUIRED = [
     ".github/workflows/webgpu-forward-port-probe.yml",
     "networking/source-lock.json",
     "networking/spritely/web/bootstrap.mjs",
+    "tools/godot/run_test_suite.py",
+    "tools/godot/test_suite.json",
     "tools/networking/package_spritely_web.sh",
     "game/project.godot",
     "game/export_presets.cfg",
@@ -55,6 +57,7 @@ def main() -> None:
     for path in [
         "engine/source-lock.json",
         "networking/source-lock.json",
+        "tools/godot/test_suite.json",
         "packages/schemas/car.schema.json",
         "packages/schemas/track.schema.json",
         "packages/schemas/cue-set.schema.json",
@@ -156,9 +159,9 @@ def main() -> None:
     export_presets = (ROOT / "game/export_presets.cfg").read_text(encoding="utf-8")
     for marker in (
         'name="Web Playable"',
-        'spritely/reflect.js',
-        'globalThis.HootScheme = Scheme',
-        'spritely/bootstrap.mjs',
+        "spritely/reflect.js",
+        "globalThis.HootScheme = Scheme",
+        "spritely/bootstrap.mjs",
     ):
         if marker not in export_presets:
             raise SystemExit(f"Web Playable export is missing Spritely bootstrap marker: {marker}")

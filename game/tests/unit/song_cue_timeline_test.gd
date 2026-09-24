@@ -15,6 +15,10 @@ func _ready() -> void:
 		],
 	}
 	_check(SongCueTimeline.validate(cue_set).is_empty(), "valid cue set should pass")
+	var json_round_trip = JSON.parse_string(JSON.stringify(cue_set))
+	_check(json_round_trip is Dictionary, "cue set JSON round trip should produce an object")
+	if json_round_trip is Dictionary:
+		_check(SongCueTimeline.validate(json_round_trip).is_empty(), "valid on-disk JSON numbers should preserve integer semantics")
 	var timeline := SongCueTimeline.new()
 	_check(timeline.configure(cue_set).is_empty(), "valid cue set should configure")
 	_check(timeline.cue_count() == 4, "all cues should be retained")
@@ -33,6 +37,10 @@ func _ready() -> void:
 	timeline.seek_to(500)
 	var after_seek := timeline.advance_to(1000)
 	_check(after_seek.size() == 2, "seeking backward should allow future cues to fire again")
+
+	var fractional_time := cue_set.duplicate(true)
+	fractional_time["cues"][0]["time_ms"] = 3000.5
+	_check(not SongCueTimeline.validate(fractional_time).is_empty(), "fractional cue times must still fail integer semantics")
 
 	var bad_kind := cue_set.duplicate(true)
 	bad_kind["cues"][0]["kind"] = "change_vehicle_physics"
