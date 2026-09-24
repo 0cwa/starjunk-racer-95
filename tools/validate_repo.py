@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -17,10 +18,13 @@ REQUIRED = [
     "tools/engine/build_webgpu_rust_deps.sh",
     "tools/engine/forward_port_probe.sh",
     "tools/engine/export_webgpu_benchmark.sh",
+    "tools/engine/export_webgpu_playable.sh",
     "tools/engine/analyze_spirv_dumps.sh",
     "tools/perf/webgpu_browser_smoke.py",
     "game/tests/perf/webgpu_boot/webgpu_boot.gd",
     "game/tests/perf/webgpu_boot/webgpu_boot.tscn",
+    "game/tests/integration/web_playable_smoke.gd",
+    "game/tests/integration/web_playable_smoke_test.tscn",
     ".github/workflows/webgpu-candidate-build.yml",
     ".github/workflows/webgpu-forward-port-probe.yml",
     "networking/source-lock.json",
@@ -53,6 +57,12 @@ def main() -> None:
     missing = [path for path in REQUIRED if not (ROOT / path).is_file()]
     if missing:
         raise SystemExit("Missing required repository files: " + ", ".join(missing))
+
+    # The candidate workflow invokes this helper directly; a non-executable
+    # Git mode passes shell syntax checks but stops delivery after the build.
+    playable_export = ROOT / "tools/engine/export_webgpu_playable.sh"
+    if not os.access(playable_export, os.X_OK):
+        raise SystemExit(f"WebGPU playable export helper is not executable: {playable_export}")
 
     for path in [
         "engine/source-lock.json",

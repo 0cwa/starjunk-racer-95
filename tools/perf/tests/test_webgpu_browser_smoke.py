@@ -5,6 +5,7 @@ import tempfile
 import unittest
 
 from tools.perf.webgpu_browser_smoke import (
+    RESULT_CONSOLE_PREFIXES,
     SPIRV_DUMP_CONSOLE_PREFIX,
     WEBGPU_EVENT_CONSOLE_PREFIX,
     console_json_from_event,
@@ -25,26 +26,10 @@ def console_event(value: str) -> dict:
 
 
 class WebGPUBrowserSmokeParsingTests(unittest.TestCase):
-    def test_finds_structured_boot_result_from_console(self):
-        payload = {
-            "profile": "boot",
-            "renderer": "mobile",
-            "rendering_driver": "webgpu",
-            "frames": 8,
-        }
-        events = [
-            console_event("unrelated"),
-            console_event("STARJUNK_WEBGPU_BOOT_JSON:" + json.dumps(payload)),
-        ]
+    def test_playable_result_prefix_is_registered(self):
         self.assertEqual(
-            find_console_json(events, "STARJUNK_WEBGPU_BOOT_JSON:"),
-            payload,
-        )
-
-    def test_ignores_malformed_prefixed_console_json(self):
-        event = console_event("STARJUNK_WEBGPU_BOOT_JSON:{not-json")
-        self.assertIsNone(
-            console_json_from_event(event, "STARJUNK_WEBGPU_BOOT_JSON:")
+            RESULT_CONSOLE_PREFIXES["__STARJUNK_PLAYABLE_RESULT__"],
+            "STARJUNK_PLAYABLE_JSON:",
         )
 
     def test_reconstructs_chunked_spirv_dump(self):
@@ -67,6 +52,28 @@ class WebGPUBrowserSmokeParsingTests(unittest.TestCase):
             self.assertEqual(summaries[0]["size_bytes"], len(raw))
             dumped = Path(temp_dir, summaries[0]["file"]).read_bytes()
             self.assertEqual(dumped, raw)
+
+    def test_finds_structured_boot_result_from_console(self):
+        payload = {
+            "profile": "boot",
+            "renderer": "mobile",
+            "rendering_driver": "webgpu",
+            "frames": 8,
+        }
+        events = [
+            console_event("unrelated"),
+            console_event("STARJUNK_WEBGPU_BOOT_JSON:" + json.dumps(payload)),
+        ]
+        self.assertEqual(
+            find_console_json(events, "STARJUNK_WEBGPU_BOOT_JSON:"),
+            payload,
+        )
+
+    def test_ignores_malformed_prefixed_console_json(self):
+        event = console_event("STARJUNK_WEBGPU_BOOT_JSON:{not-json")
+        self.assertIsNone(
+            console_json_from_event(event, "STARJUNK_WEBGPU_BOOT_JSON:")
+        )
 
     def test_reconstructs_spaced_godot_print_line_spirv_dump(self):
         raw = b"\x03\x02#\x07" + bytes(range(16))

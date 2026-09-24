@@ -121,6 +121,7 @@ SPIRV_DUMP_CONSOLE_PREFIX = "STARJUNK_SPIRV_DUMP:"
 RESULT_CONSOLE_PREFIXES = {
     "__STARJUNK_BOOT_RESULT__": "STARJUNK_WEBGPU_BOOT_JSON:",
     "__STARJUNK_PERF_RESULT__": "STARJUNK_PERF_JSON:",
+    "__STARJUNK_PLAYABLE_RESULT__": "STARJUNK_PLAYABLE_JSON:",
 }
 
 
@@ -279,11 +280,11 @@ def summarize_cdp_events(events: list[dict]) -> dict:
                 "values": values,
                 "timestamp": params.get("timestamp"),
             })
-            if console_type == "error":
-                for value in values:
-                    message = str(value)
-                    if message and message not in renderer_errors:
-                        renderer_errors.append(message)
+            for value in values:
+                message = str(value)
+                translation_failure = "[WGPU] WGSL compilation " in message
+                if (console_type == "error" or translation_failure) and message and message not in renderer_errors:
+                    renderer_errors.append(message)
         elif method == "Runtime.exceptionThrown":
             details = params.get("exceptionDetails", {})
             exception = details.get("exception", {})
@@ -337,6 +338,12 @@ def main() -> int:
     parser.add_argument("--purpose", default="browser_webgpu_smoke")
     parser.add_argument("--expected-profile", default="")
     parser.add_argument("--spirv-dump-dir", default="")
+    parser.add_argument(
+        "--required-console-prefix",
+        action="append",
+        default=[],
+        help="Require an additional JSON console signal with this prefix.",
+    )
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
@@ -620,6 +627,7 @@ window.addEventListener('unhandledrejection', (event) => {
                     "result_global": args.result_global,
                     "result_console_prefix": result_console_prefix,
                     "browser_events": browser_events[-120:],
+            "spirv_dumps": spirv_dumps,
                 },
                 "cdp_events": summarize_cdp_events(cdp.events),
                 "chromium_stdout_tail": tail_text(stdout_path),
@@ -636,6 +644,20 @@ window.addEventListener('unhandledrejection', (event) => {
             print(json.dumps(failure_result, indent=2))
             raise TimeoutError(f"Godot WebGPU result {args.result_global!r} was not published")
 
+        required_console_results: dict[str, object] = {}
+        missing_console_prefixes: list[str] = []
+        for prefix in args.required_console_prefix:
+            required_payload = find_console_json(cdp.events, prefix)
+            if required_payload is None:
+                required_payload = wait_for_console_json(
+                    cdp, prefix, min(args.timeout, 20.0)
+                )
+            if required_payload is None:
+                missing_console_prefixes.append(prefix)
+            else:
+                required_console_results[prefix] = required_payload
+
+        browser_events = extract_browser_events(cdp.events)
         event_summary = summarize_cdp_events(cdp.events)
 
         result = {
@@ -647,6 +669,7 @@ window.addEventListener('unhandledrejection', (event) => {
             "payload": payload,
             "cdp_events": event_summary,
             "browser_events": browser_events[-120:],
+            "required_console_results": required_console_results,
             "spirv_dumps": spirv_dumps,
         }
 
@@ -658,6 +681,10 @@ window.addEventListener('unhandledrejection', (event) => {
         if driver != "webgpu":
             validation_errors.append(
                 f"Expected Web rendering driver label 'webgpu', got {driver!r}"
+            )
+        for prefix in missing_console_prefixes:
+            validation_errors.append(
+                f"Required browser console signal {prefix!r} was not observed"
             )
 
         renderer_errors = list(event_summary.get("renderer_errors", []))

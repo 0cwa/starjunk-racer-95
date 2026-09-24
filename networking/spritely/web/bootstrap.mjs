@@ -24,3 +24,4 @@ if (!globalThis.StarjunkSpritelyReady) {
 }
 
 await globalThis.StarjunkSpritelyReady;
+console.log("STARJUNK_SPRITELY_READY_JSON:" + JSON.stringify({ ready: true }));
