@@ -164,7 +164,7 @@ jobs:
         run: networking/spritely/run_spike.sh
       - name: Export real PrototypeRace browser smoke
         env:
-          STARJUNK_WEB_TEXT_DRIVER: Fallback
+          STARJUNK_WEB_TEXT_DRIVER: "Fallback (Built-in)"
         run: |
           tools/engine/export_webgpu_playable.sh \
             "$GODOT_BIN" \
@@ -206,7 +206,7 @@ jobs:
           if-no-files-found: warn
       - name: Export shareable PrototypeRace browser demo
         env:
-          STARJUNK_WEB_TEXT_DRIVER: Fallback
+          STARJUNK_WEB_TEXT_DRIVER: "Fallback (Built-in)"
         run: |
           tools/engine/export_webgpu_playable.sh \
             "$GODOT_BIN" \
