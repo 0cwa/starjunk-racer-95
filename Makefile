@@ -4,6 +4,7 @@ check:
 	python3 tools/validate_repo.py
 	python3 tools/godot/run_test_suite.py --validate-only
 	python3 -m unittest discover -s tools/perf/tests -p 'test_*.py'
+	python3 tools/engine/test_particles_alias_patch.py
 	bash -n tools/perf/run_godot_benchmark.sh
 	bash -n tools/engine/fetch_sources.sh
 	bash -n tools/engine/build_reference_webgpu.sh
