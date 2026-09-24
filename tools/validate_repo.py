@@ -135,6 +135,9 @@ def main() -> None:
     if "'engine/patches/*.patch'" not in candidate_workflow:
         raise SystemExit("WebGPU candidate cache key must include local patch contents")
 
+    if "STARJUNK_WEB_TEXT_DRIVER: Fallback" not in candidate_workflow:
+        raise SystemExit("WebGPU playable candidate must select the fallback text driver")
+
     compatibility_workflow = (
         ROOT / ".github/workflows/browser-demo.yml"
     ).read_text(encoding="utf-8")
