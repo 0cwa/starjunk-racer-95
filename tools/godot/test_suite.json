@@ -23,6 +23,7 @@
     {"scene": "res://tests/integration/raycast_vehicle_test.tscn", "fixed_fps": 60},
     {"scene": "res://tests/integration/road_surface_vehicle_test.tscn", "fixed_fps": 60, "timeout_seconds": 45},
     {"scene": "res://tests/integration/prototype_race_test.tscn", "fixed_fps": 60, "timeout_seconds": 45},
+    {"scene": "res://tests/integration/web_playable_smoke_test.tscn", "fixed_fps": 60, "timeout_seconds": 30},
     {"scene": "res://tests/integration/course_visual_adapter_test.tscn"},
     {"scene": "res://tests/integration/race_content_agreement_test.tscn", "timeout_seconds": 45},
     {"scene": "res://tests/integration/community_race_bundle_test.tscn", "timeout_seconds": 45},
