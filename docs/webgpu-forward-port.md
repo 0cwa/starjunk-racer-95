@@ -62,6 +62,27 @@ if the upstream pin changes.
 - `tools/perf/webgpu_browser_smoke.py` — Chromium/CDP gate with WebGPU adapter probe and detailed failure diagnostics.
 - `WebGPU Forward Port Probe` and `WebGPU 4.7.2 Candidate Build` — hosted CI gates on relevant pull requests and `main`.
 
+### Browser crash diagnostics
+
+The candidate workflow retains Wasm function names with Emscripten's
+`--profiling-funcs` linker option. Release optimization and `debug_symbols=no`
+remain enabled; this keeps cached compilation reusable and avoids full DWARF
+debug data while making browser exception stacks identify engine functions.
+The resulting template is a correctness candidate, not an authoritative
+performance measurement.
+
+The browser harness treats uncaught exceptions and unhandled rejections as fatal
+even if a scene publishes a success payload afterward. Failure artifacts preserve
+the original stack and distinguish runtime exceptions from timeouts. Console
+summaries retain startup and recent messages, while validation scans the complete
+captured event stream so shader logging cannot hide an earlier error.
+
+Use the exact failing revision's template and browser-smoke artifact together.
+Function indexes from a stripped Wasm build cannot safely be mapped using a
+different build. Diagnose the full `PrototypeRace` with its HUD intact before
+changing rendering behavior or attributing a crash to text, particles, or another
+feature.
+
 ## Phases
 
 1. **Browser boot correctness:** make the minimal Mobile/WebGPU scene reach GDScript.
