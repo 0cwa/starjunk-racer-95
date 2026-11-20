@@ -169,7 +169,32 @@ def find_console_json(events: list[dict], prefix: str):
     return None
 
 
+class BrowserRuntimeError(RuntimeError):
+    """An uncaught browser exception makes the smoke result invalid."""
+
+
+def runtime_exception_message(event: dict) -> str | None:
+    if event.get("method") == "Runtime.exceptionThrown":
+        details = event.get("params", {}).get("exceptionDetails", {})
+        exception = details.get("exception", {})
+        description = exception.get("description") or details.get("text") or "Uncaught exception"
+        return f"Browser runtime exception: {description}"
+    payload = console_json_from_event(event, WEBGPU_EVENT_CONSOLE_PREFIX)
+    if isinstance(payload, dict) and payload.get("type") in ("error", "unhandledrejection"):
+        description = payload.get("stack") or payload.get("message") or payload["type"]
+        return f"Browser runtime exception: {description}"
+    return None
+
+
+def check_runtime_exceptions(events: list[dict]) -> None:
+    for event in events:
+        message = runtime_exception_message(event)
+        if message is not None:
+            raise BrowserRuntimeError(message)
+
+
 def wait_for_console_json(cdp: CDP, prefix: str, timeout: float):
+    check_runtime_exceptions(cdp.events)
     payload = find_console_json(cdp.events, prefix)
     if payload is not None:
         return payload
@@ -180,6 +205,7 @@ def wait_for_console_json(cdp: CDP, prefix: str, timeout: float):
         event = cdp.receive_event(remaining)
         if event is None:
             continue
+        check_runtime_exceptions([event])
         payload = console_json_from_event(event, prefix)
         if payload is not None:
             return payload
@@ -280,7 +306,10 @@ def summarize_cdp_events(events: list[dict]) -> dict:
     log_entries: list[dict] = []
     renderer_errors: list[str] = []
 
-    for event in events[-500:]:
+    # Inspect the complete event stream before bounding each output category.
+    # Shader compilation is noisy enough to evict startup messages and failures
+    # from a shared tail, including the very exception this artifact must retain.
+    for event in events:
         method = event.get("method")
         params = event.get("params", {})
         if method == "Runtime.consoleAPICalled":
@@ -307,6 +336,7 @@ def summarize_cdp_events(events: list[dict]) -> dict:
                 "url": details.get("url", ""),
                 "line": details.get("lineNumber"),
                 "column": details.get("columnNumber"),
+                "stack_trace": details.get("stackTrace", {}),
             })
         elif method == "Network.loadingFailed":
             network_failures.append({
@@ -418,6 +448,10 @@ def main() -> int:
         text=True,
     )
     cdp: CDP | None = None
+    adapter_probe = None
+    payload = None
+    result_console_prefix = RESULT_CONSOLE_PREFIXES.get(args.result_global, "")
+    spirv_dump_dir = Path(args.spirv_dump_dir).resolve() if args.spirv_dump_dir else None
     try:
         ws_url = wait_for_page(debug_port, 30.0)
         cdp = CDP(ws_url)
@@ -524,22 +558,26 @@ window.__STARJUNK_BROWSER_EVENTS__ = [];
 })();
 
 window.addEventListener('error', (event) => {
-    window.__STARJUNK_BROWSER_EVENTS__.push({
+    const payload = {
         type: 'error',
         message: String(event.message || ''),
         filename: String(event.filename || ''),
         line: event.lineno || 0,
         column: event.colno || 0,
         stack: event.error && event.error.stack ? String(event.error.stack) : ''
-    });
+    };
+    window.__STARJUNK_BROWSER_EVENTS__.push(payload);
+    console.log('STARJUNK_WEBGPU_EVENT_JSON:' + JSON.stringify(payload));
 });
 window.addEventListener('unhandledrejection', (event) => {
     const reason = event.reason;
-    window.__STARJUNK_BROWSER_EVENTS__.push({
+    const payload = {
         type: 'unhandledrejection',
         message: String(reason && reason.message ? reason.message : reason),
         stack: reason && reason.stack ? String(reason.stack) : ''
-    });
+    };
+    window.__STARJUNK_BROWSER_EVENTS__.push(payload);
+    console.log('STARJUNK_WEBGPU_EVENT_JSON:' + JSON.stringify(payload));
 });
 """
             },
@@ -609,8 +647,7 @@ window.addEventListener('unhandledrejection', (event) => {
         ):
             raise RuntimeError(f"WebGPU adapter unavailable: {adapter_probe}")
 
-        result_console_prefix = RESULT_CONSOLE_PREFIXES.get(args.result_global, "")
-        payload = None
+        check_runtime_exceptions(cdp.events)
         if result_console_prefix:
             # Once Godot's Wasm main loop starts, Runtime.evaluate can be delayed
             # indefinitely by a busy browser main thread. The benchmark scenes
@@ -625,42 +662,18 @@ window.addEventListener('unhandledrejection', (event) => {
                     payload = cdp.evaluate(result_expression, timeout=2.0)
                 except TimeoutError:
                     payload = None
+                check_runtime_exceptions(cdp.events)
                 if payload is not None:
                     break
                 time.sleep(0.5)
 
-        browser_events = extract_browser_events(cdp.events)
-        spirv_dump_dir = Path(args.spirv_dump_dir).resolve() if args.spirv_dump_dir else None
         spirv_dumps = write_spirv_dumps(cdp.events, spirv_dump_dir)
         if payload is None:
-            stdout_handle.flush()
-            stderr_handle.flush()
-            failure_result = {
-                "schema_version": 3,
-                "authoritative_performance": False,
-                "purpose": args.purpose,
-                "browser": Path(chrome).name,
-                "adapter_probe": adapter_probe,
-                "diagnostics": {
-                    "result_global": args.result_global,
-                    "result_console_prefix": result_console_prefix,
-                    "browser_events": browser_events[-120:],
-            "spirv_dumps": spirv_dumps,
-                },
-                "cdp_events": summarize_cdp_events(cdp.events),
-                "chromium_stdout_tail": tail_text(stdout_path),
-                "chromium_stderr_tail": tail_text(stderr_path),
-                "spirv_dumps": spirv_dumps,
-                "error": (
-                    f"Timed out waiting for console result {result_console_prefix!r}"
-                    if result_console_prefix
-                    else f"Timed out waiting for window.{args.result_global}"
-                ),
-            }
-            output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_text(json.dumps(failure_result, indent=2) + "\n", encoding="utf-8")
-            print(json.dumps(failure_result, indent=2))
-            raise TimeoutError(f"Godot WebGPU result {args.result_global!r} was not published")
+            raise TimeoutError(
+                f"Timed out waiting for console result {result_console_prefix!r}"
+                if result_console_prefix
+                else f"Timed out waiting for window.{args.result_global}"
+            )
 
         required_console_results: dict[str, object] = {}
         missing_console_prefixes: list[str] = []
@@ -675,6 +688,7 @@ window.addEventListener('unhandledrejection', (event) => {
             else:
                 required_console_results[prefix] = required_payload
 
+        check_runtime_exceptions(cdp.events)
         browser_events = extract_browser_events(cdp.events)
         event_summary = summarize_cdp_events(cdp.events)
 
@@ -737,6 +751,42 @@ window.addEventListener('unhandledrejection', (event) => {
         if validation_errors:
             raise RuntimeError(result["error"])
         return 0
+    except (BrowserRuntimeError, TimeoutError) as exc:
+        events = cdp.events if cdp is not None else []
+        # A busy or crashed Wasm thread can also prevent a CDP reply. Preserve
+        # the actual exception instead of presenting that as a generic timeout.
+        try:
+            check_runtime_exceptions(events)
+        except BrowserRuntimeError as runtime_error:
+            exc = runtime_error
+        browser_events = extract_browser_events(events)
+        spirv_dumps = write_spirv_dumps(events, spirv_dump_dir)
+        stdout_handle.flush()
+        stderr_handle.flush()
+        failure_result = {
+            "schema_version": 3,
+            "authoritative_performance": False,
+            "purpose": args.purpose,
+            "browser": Path(chrome).name,
+            "adapter_probe": adapter_probe,
+            "payload": payload,
+            "failure_kind": "runtime_exception" if isinstance(exc, BrowserRuntimeError) else "timeout",
+            "diagnostics": {
+                "result_global": args.result_global,
+                "result_console_prefix": result_console_prefix,
+                "browser_events": browser_events[-120:],
+                "spirv_dumps": spirv_dumps,
+            },
+            "cdp_events": summarize_cdp_events(events),
+            "chromium_stdout_tail": tail_text(stdout_path),
+            "chromium_stderr_tail": tail_text(stderr_path),
+            "spirv_dumps": spirv_dumps,
+            "error": str(exc),
+        }
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(failure_result, indent=2) + "\n", encoding="utf-8")
+        print(json.dumps(failure_result, indent=2))
+        raise exc
     finally:
         if cdp is not None:
             cdp.close()

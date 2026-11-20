@@ -78,6 +78,8 @@ jobs:
         run: tools/engine/build_webgpu_rust_deps.sh build/webgpu-port-candidate/godot build/webgpu-rust-deps
       - name: Compile WebGPU web template
         run: |
+          # Keep release optimization and cached objects, but retain Wasm function
+          # names so browser crashes identify the failing engine path.
           scons -C build/webgpu-port-candidate/godot \
             platform=web \
             target=template_release \
@@ -89,6 +91,7 @@ jobs:
             dlink_enabled=no \
             lto=none \
             debug_symbols=no \
+            linkflags=--profiling-funcs \
             cache_path="$SCONS_CACHE" \
             cache_limit=8 \
             -j2
